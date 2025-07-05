@@ -51,6 +51,18 @@
             if (processedSet.has(row)) continue;
             processedSet.add(row);
 
+             const statusTd = row.querySelector('td[data-label="提出状況"]');
+            if (statusTd) {
+                const statusSpan = statusTd.querySelector('span');
+                if (statusSpan) {
+                    if (statusSpan.textContent.trim() === "未提出") {
+                        statusSpan.style.color = "red";
+                    } else if (statusSpan.textContent.trim() === "提出済") {
+                        statusSpan.style.color = "green";
+                    }
+                }
+            }
+            
             const deadline = getDeadlineDate(row);
             const now = Date.now();
 
