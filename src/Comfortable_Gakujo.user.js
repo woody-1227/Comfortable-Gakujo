@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Comfortable Gakujo
 // @namespace    http://tampermonkey.net/
-// @version      1.1.0
+// @version      1.1.1
 // @description  必ず読んでからご利用ください：https://github.com/woody-1227/Comfortable-Gakujo/blob/main/README.md
 // @author       woody_1227
 // @match        https://gakujo.shizuoka.ac.jp/*
@@ -133,11 +133,11 @@
             } else {
                 timer.textContent = formatTimeLeft(remaining);
                 const days = Math.floor(remaining / (1000 * 60 * 60 * 24));
-                if (days === 0) {
+                if (days < 1) {
                     Object.assign(timer.style, {
                         color: "red", fontWeight: "bold", textDecoration: "underline"
                     });
-                } else if (days <= 3) {
+                } else if (days < 3) {
                     Object.assign(timer.style, {
                         color: "#FF8C00", fontWeight: "bold", textDecoration: "none"
                     });
