@@ -9,7 +9,8 @@
 ## インストール
 ### 1. ブラウザにTampermonkeyをインストールする
 - chrome ウェブストア  
-https://chromewebstore.google.com/detail/tampermonkey/dhdgffkkebhmkfjojejmpbldmpobfkfo?hl=ja
+https://chromewebstore.google.com/detail/tampermonkey/dhdgffkkebhmkfjojejmpbldmpobfkfo?hl=ja  
+__[注意] chrome://extensions/ より、「デベロッパーモード」を有効化する必要があります。__
 - Firefox Browser ADD-ONS  
 https://addons.mozilla.org/ja/firefox/addon/tampermonkey/
 ### 2. ブラウザで次のリンクにアクセスし、画面の指示に従って操作する
