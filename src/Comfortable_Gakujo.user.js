@@ -1,10 +1,11 @@
 // ==UserScript==
 // @name         Comfortable Gakujo
 // @namespace    http://tampermonkey.net/
-// @version      1.3.0
+// @version      1.4.0
 // @description  READMEを必ず読んでからご利用ください：https://github.com/woody-1227/Comfortable-Gakujo/blob/main/README.md
 // @author       woody_1227
 // @match        https://gakujo.shizuoka.ac.jp/*
+// @match        https://idp.shizuoka.ac.jp/*
 // @grant        none
 // @updateURL    https://github.com/woody-1227/Comfortable-Gakujo/raw/main/src/Comfortable_Gakujo.user.js
 // @downloadURL  https://github.com/woody-1227/Comfortable-Gakujo/raw/main/src/Comfortable_Gakujo.user.js
@@ -91,7 +92,7 @@
                 let hiddenCount = 0;
                 hiddenTasks.forEach(task => {
                     const submittalTerm = new Date(task.submittalTerm.split("～")[1].trim());
-                    if (submittalTerm > now && task.submittalStatus=== "未提出") {
+                    if (submittalTerm > now && task.submittalStatus === "未提出") {
                         hiddenCount++;
                     }
                 });
@@ -402,5 +403,14 @@
                 }
             });
         }, 1000);
+    }
+
+    if (location.hostname === "idp.shizuoka.ac.jp") {
+        const btn = document.getElementsByName("_eventId_proceed")[0];
+
+        if (btn) {
+            console.log("[Comfortable Gakujo] Auto login click");
+            btn.click();
+        }
     }
 })();
