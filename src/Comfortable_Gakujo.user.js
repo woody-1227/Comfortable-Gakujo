@@ -1,11 +1,13 @@
 // ==UserScript==
 // @name         Comfortable Gakujo
 // @namespace    http://tampermonkey.net/
-// @version      1.4.0
+// @version      1.5.0
 // @description  READMEを必ず読んでからご利用ください：https://github.com/woody-1227/Comfortable-Gakujo/blob/main/README.md
 // @author       woody_1227
 // @match        https://gakujo.shizuoka.ac.jp/*
 // @match        https://idp.shizuoka.ac.jp/*
+// @run-at       document-start
+// @inject-into  page
 // @grant        none
 // @updateURL    https://github.com/woody-1227/Comfortable-Gakujo/raw/main/src/Comfortable_Gakujo.user.js
 // @downloadURL  https://github.com/woody-1227/Comfortable-Gakujo/raw/main/src/Comfortable_Gakujo.user.js
@@ -14,6 +16,24 @@
 
 (function () {
     'use strict';
+
+    let gradeJson = "";
+
+    const setCookie = (name, value, days = 365) => {
+        const expires = new Date(Date.now() + days * 864e5).toUTCString();
+        document.cookie = `${name}=${encodeURIComponent(value)}; expires=${expires}; path=/`;
+    };
+
+    const getCookie = (name) => {
+        return document.cookie
+            .split("; ")
+            .find(row => row.startsWith(name + "="))
+            ?.split("=")[1];
+    };
+
+    const deleteCookie = (name) => {
+        document.cookie = `${name}=; max-age=0; path=/`;
+    };
 
     const getHiddenTasks = () => {
         let hiddenTasks = [];
@@ -48,7 +68,7 @@
             const uuid = self.crypto.randomUUID();
             const cookieName = `cg_hidden_${uuid}`;
             const task = { submissionType, subject, title, submittalTerm, submittalStatus };
-            document.cookie = cookieName + "=" + encodeURIComponent(JSON.stringify(task)) + "; path=/; max-age=31536000";
+            setCookie(cookieName, JSON.stringify(task), 365);
         }
     };
 
@@ -66,7 +86,7 @@
                         if (task.submissionType === submissionType &&
                             task.subject === subject &&
                             task.title === title) {
-                            document.cookie = cookieName + "=; path=/; max-age=0";
+                            deleteCookie(cookieName);
                         }
                     } catch (e) {
 
@@ -102,6 +122,198 @@
             }
         });
         waitForCountElement.observe(document.body, { childList: true, subtree: true });
+        window.addEventListener("DOMContentLoaded", showUpdateNotice);
+
+        window.addEventListener('load', () => {
+            const mediumSizeItems = document.getElementById("mediumSizeItems");
+            const li = document.createElement('li');
+            li.className = 'index-notice-other-item';
+            if (getCookie("cg_grade_save_enabled") === "1") {
+                li.innerHTML = `
+                <div class="cg-index-main-visual-notice-box cg-index-notice-other-link">
+                    <p class="title" style="text-align: center;">成績更新通知</p>
+                    <div class="content" style="width: fit-content; margin: auto; margin-top: 1em;">
+                        <div class="cg-checkbox-wrapper-8">
+                            <input type="checkbox" id="cg-grade-save-toggle" class="cg-tgl cg-tgl-skewed" checked>
+                            <label for="cg-grade-save-toggle" data-tg-on="ON" data-tg-off="OFF" class="cg-tgl-btn"></label>
+                        </div>
+                    </div>
+                </div>
+                `;
+            } else {
+                li.innerHTML = `
+                <div class="cg-index-main-visual-notice-box cg-index-notice-other-link">
+                    <p class="title" style="text-align: center;">成績更新通知</p>
+                    <div class="content" style="width: fit-content; margin: auto; margin-top: 1em;">
+                        <div class="cg-checkbox-wrapper-8">
+                            <input type="checkbox" id="cg-grade-save-toggle" class="cg-tgl cg-tgl-skewed">
+                            <label for="cg-grade-save-toggle" data-tg-on="ON" data-tg-off="OFF" class="cg-tgl-btn"></label>
+                        </div>
+                    </div>
+                </div>
+                `;
+            }
+            const style = document.createElement('style');
+            style.textContent = `
+            .cg-index-main-visual-notice-box {
+                display: flex;
+                flex-wrap: wrap;
+                align-items: center;
+                justify-content: space-between;
+                position: relative;
+                padding: 0 12px;
+                border-radius: 4px;
+                box-shadow: 0 0 3px 0 rgba(57, 57, 57, .15);
+                border: 2px solid #a1a1a1;
+                background-color: #fff;
+            }
+
+            .cg-index-notice-other-link {
+                display: block;
+                height: 100%;
+                padding: 10px 15px 10px 5px;
+            }
+
+            .cg-checkbox-wrapper-8 .cg-tgl {
+                display: none;
+            }
+
+            .cg-checkbox-wrapper-8 .cg-tgl,
+            .cg-checkbox-wrapper-8 .cg-tgl:after,
+            .cg-checkbox-wrapper-8 .cg-tgl:before,
+            .cg-checkbox-wrapper-8 .cg-tgl *,
+            .cg-checkbox-wrapper-8 .cg-tgl *:after,
+            .cg-checkbox-wrapper-8 .cg-tgl *:before,
+            .cg-checkbox-wrapper-8 .cg-tgl + .cg-tgl-btn {
+                box-sizing: border-box;
+            }
+
+            .cg-checkbox-wrapper-8 .cg-tgl::-moz-selection,
+            .cg-checkbox-wrapper-8 .cg-tgl:after::-moz-selection,
+            .cg-checkbox-wrapper-8 .cg-tgl:before::-moz-selection,
+            .cg-checkbox-wrapper-8 .cg-tgl *::-moz-selection,
+            .cg-checkbox-wrapper-8 .cg-tgl *:after::-moz-selection,
+            .cg-checkbox-wrapper-8 .cg-tgl *:before::-moz-selection,
+            .cg-checkbox-wrapper-8 .cg-tgl + .cg-tgl-btn::-moz-selection,
+            .cg-checkbox-wrapper-8 .cg-tgl::selection,
+            .cg-checkbox-wrapper-8 .cg-tgl:after::selection,
+            .cg-checkbox-wrapper-8 .cg-tgl:before::selection,
+            .cg-checkbox-wrapper-8 .cg-tgl *::selection,
+            .cg-checkbox-wrapper-8 .cg-tgl *:after::selection,
+            .cg-checkbox-wrapper-8 .cg-tgl *:before::selection,
+            .cg-checkbox-wrapper-8 .cg-tgl + .cg-tgl-btn::selection {
+                background: none;
+            }
+
+            .cg-checkbox-wrapper-8 .cg-tgl + .cg-tgl-btn {
+                outline: 0;
+                display: block;
+                width: 4em;
+                height: 2em;
+                position: relative;
+                cursor: pointer;
+                -webkit-user-select: none;
+                -moz-user-select: none;
+                -ms-user-select: none;
+                user-select: none;
+            }
+
+            .cg-checkbox-wrapper-8 .cg-tgl + .cg-tgl-btn:after,
+            .cg-checkbox-wrapper-8 .cg-tgl + .cg-tgl-btn:before {
+                position: relative;
+                display: block;
+                content: "";
+                width: 50%;
+                height: 100%;
+            }
+
+            .cg-checkbox-wrapper-8 .cg-tgl + .cg-tgl-btn:after {
+                left: 0;
+            }
+
+            .cg-checkbox-wrapper-8 .cg-tgl + .cg-tgl-btn:before {
+                display: none;
+            }
+
+            .cg-checkbox-wrapper-8 .cg-tgl:checked + .cg-tgl-btn:after {
+                left: 50%;
+            }
+
+            .cg-checkbox-wrapper-8 .cg-tgl-skewed + .cg-tgl-btn {
+                overflow: hidden;
+                transform: skew(-10deg);
+                -webkit-backface-visibility: hidden;
+                backface-visibility: hidden;
+                transition: all 0.2s ease;
+                font-family: sans-serif;
+                background: #888;
+            }
+
+            .cg-checkbox-wrapper-8 .cg-tgl-skewed + .cg-tgl-btn:after,
+            .cg-checkbox-wrapper-8 .cg-tgl-skewed + .cg-tgl-btn:before {
+                transform: skew(10deg);
+                display: inline-block;
+                transition: all 0.2s ease;
+                width: 100%;
+                text-align: center;
+                position: absolute;
+                line-height: 2em;
+                font-weight: bold;
+                color: #fff;
+                text-shadow: 0 1px 0 rgba(0, 0, 0, 0.4);
+            }
+
+            .cg-checkbox-wrapper-8 .cg-tgl-skewed + .cg-tgl-btn:after {
+                left: 100%;
+                content: attr(data-tg-on);
+            }
+
+            .cg-checkbox-wrapper-8 .cg-tgl-skewed + .cg-tgl-btn:before {
+                left: 0;
+                content: attr(data-tg-off);
+            }
+
+            .cg-checkbox-wrapper-8 .cg-tgl-skewed + .cg-tgl-btn:active {
+                background: #888;
+            }
+
+            .cg-checkbox-wrapper-8 .cg-tgl-skewed + .cg-tgl-btn:active:before {
+                left: -10%;
+            }
+
+            .cg-checkbox-wrapper-8 .cg-tgl-skewed:checked + .cg-tgl-btn {
+                background: #86d993;
+            }
+
+            .cg-checkbox-wrapper-8 .cg-tgl-skewed:checked + .cg-tgl-btn:before {
+                left: -100%;
+            }
+
+            .cg-checkbox-wrapper-8 .cg-tgl-skewed:checked + .cg-tgl-btn:after {
+                left: 0;
+            }
+
+            .cg-checkbox-wrapper-8 .cg-tgl-skewed:checked + .cg-tgl-btn:active:after {
+                left: 10%;
+            }
+            `;
+            document.head.appendChild(style);
+            mediumSizeItems.appendChild(li);
+        });
+
+        window.addEventListener('change', (e) => {
+            if (e.target.id === 'cg-grade-save-toggle') {
+                if (e.target.checked) {
+                    setCookie("cg_grade_save_enabled", "1");
+                    location.reload();
+                } else {
+                    deleteCookie("cg_grade_save_enabled");
+                    deleteCookie("cg_grade");
+                    deleteCookie("cg_grade_updated");
+                    document.getElementsByClassName("cg-grade-notice-container")[0]?.remove();
+                }
+            }
+        });
     } else if (document.title === "課題・アンケートリスト") {
         let processedSet = new WeakSet();
         let hiddenCount = 0;
@@ -403,14 +615,232 @@
                 }
             });
         }, 1000);
+    } else if (document.title === "成績ダッシュボード" || document.title === "成績情報") {
+        deleteCookie("cg_grade_updated");
     }
 
     if (location.hostname === "idp.shizuoka.ac.jp") {
         const btn = document.getElementsByName("_eventId_proceed")[0];
 
         if (btn) {
-            console.log("[Comfortable Gakujo] Auto login click");
+            console.log("[CG] Auto login click");
             btn.click();
         }
+    }
+    const seenCharts = new WeakSet();
+
+    function installChartHook() {
+        if (!window.Chart || !Chart.prototype) return false;
+        if (Chart.prototype._gakujo_grade_hooked) return true;
+
+        Chart.prototype._gakujo_grade_hooked = true;
+
+        const originalUpdate = Chart.prototype.update;
+
+        Chart.prototype.update = function (...args) {
+            try {
+                const labels = this.data?.labels;
+                const datasets = this.data?.datasets;
+
+                if (
+                    !Array.isArray(labels) ||
+                    !Array.isArray(datasets) ||
+                    datasets.length === 0 ||
+                    !datasets.some(ds => Array.isArray(ds.data) && ds.data.length > 0)
+                ) {
+                    return originalUpdate.apply(this, args);
+                }
+
+                if (seenCharts.has(this)) {
+                    return originalUpdate.apply(this, args);
+                }
+                seenCharts.add(this);
+
+                if (getChartTitle(this).includes("年度別修得評価")) {
+                    gradeJson = normalizeGradeChart(labels, datasets);
+                    console.log("[CG] Grade chart detected:", gradeJson);
+                    if (getCookie("cg_grade_save_enabled") === "1") {
+                        saveGradeJson(gradeJson);
+                    }
+                } else {
+                }
+            } catch (e) {
+                console.warn("[CG] Chart hook error", e);
+            }
+
+            return originalUpdate.apply(this, args);
+        };
+
+        console.log("[CG] Chart.js hook installed");
+        return true;
+    }
+
+    const waitTimer = setInterval(() => {
+        if (installChartHook()) clearInterval(waitTimer);
+    }, 50);
+
+    function normalizeGradeChart(labels, datasets) {
+        const result = {};
+
+        labels.forEach(label => {
+            result[label] = {
+                gpa: {},
+                grades: {}
+            };
+        });
+
+        datasets.forEach(ds => {
+            const name = ds.label;
+            const values = ds.data.map(v => Number(v));
+
+            if (name.includes("GPA")) {
+                labels.forEach((label, i) => {
+                    if (!isNaN(values[i])) {
+                        if (name.includes("年間")) {
+                            result[label].gpa.yearly = values[i];
+                        } else if (name.includes("平均")) {
+                            result[label].gpa.average = values[i];
+                        }
+                    }
+                });
+            }
+
+            else {
+                labels.forEach((label, i) => {
+                    if (!isNaN(values[i])) {
+                        result[label].grades[name] = values[i];
+                    }
+                });
+            }
+        });
+
+        return result;
+    }
+
+    function showUpdateNotice() {
+        if (getCookie("cg_grade_updated") !== "1") return (false);
+        if (document.title !== "ホーム画面（学生・保護者）") return (false);
+
+        const indexContainer = document.getElementsByClassName("index-container")[0];
+        const cContents = indexContainer?.getElementsByClassName("c-contents")[0];
+
+        const notice = document.createElement("div");
+        notice.className = "cg-grade-notice-container";
+        notice.innerHTML = `<button class="cg-grade-notice-button c-main-menu-btn" onclick="showLoading();postSubmit('SC_01002B00_Form', 'SC_01002B00_01/indexDashbordSeeMore')"><i class="c-icon-notice" aria-hidden="true" style="margin-right: 0.5em"></i>成績が更新されました</button>`;
+
+        const style = document.createElement('style');
+        style.textContent = `
+            .cg-grade-notice-container {
+                margin-top: 10px;
+                margin-bottom: 40px;
+            }
+
+            .cg-grade-notice-button {
+                height: 5rem;
+                width: 100%;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                position: relative;
+                margin: 0 auto;
+                padding: 1em 2em;
+                overflow: hidden;
+                border: none;
+                border-radius: 0.5rem;
+                color: #fff;
+                font-weight: 600;
+                font-size: 2.4rem;
+                cursor: pointer;
+            }
+
+            .cg-grade-notice-button::before {
+                display: block;
+                position: absolute;
+                top: -50%;
+                left: -30%;
+                transform: rotate(30deg);
+                width: 70px;
+                height: 100px;
+                content: '';
+                background-image: linear-gradient(left, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 1) 50%, rgba(255, 255, 255, 0) 100%);
+                background-image: -webkit-gradient(linear, left bottom, right bottom, color-stop(0%, rgba(255, 255, 255, 0)), color-stop(50%, rgba(255, 255, 255, 1)), color-stop(100%, rgba(255, 255, 255, 0)));
+                animation: animation-cg-grade-notice-button 3s infinite linear;
+            }
+
+            @keyframes animation-cg-grade-notice-button {
+                17% {
+                    left: 120%;
+                }
+                100% {
+                    left: 120%;
+                }
+            }
+
+            .cg-grade-notice-button::after {
+                content: '';
+                transform: rotate(45deg);
+                width: 0.5em;
+                height: 0.5em;
+                margin-left: 0.5em;
+                border-top: 2px solid #fff;
+                border-right: 2px solid #fff;
+            }
+        `;
+
+        if (!document.querySelector('style[data-cg-grade-notice]')) {
+            style.setAttribute('data-cg-grade-notice', 'true');
+            document.head.appendChild(style);
+        }
+
+        if (cContents) {
+            cContents.insertBefore(notice, cContents.firstChild);
+        }
+
+        return (true);
+    }
+
+    async function saveGradeJson(newJson) {
+        const prev = getCookie("cg_grade");
+        const newStr = await sha256(JSON.stringify(newJson));
+
+        if (prev && decodeURIComponent(prev) !== newStr) {
+            setCookie("cg_grade_updated", "1");
+        }
+
+        setCookie("cg_grade", newStr);
+    }
+
+    function getChartTitle(chart) {
+        // Chart.js v3+
+        const t3 = chart.options?.plugins?.title?.text;
+        if (typeof t3 === "string") return t3;
+        if (Array.isArray(t3)) return t3.join("");
+
+        // Chart.js v2
+        const t2 = chart.options?.title?.text;
+        if (typeof t2 === "string") return t2;
+        if (Array.isArray(t2)) return t2.join("");
+
+        return "";
+    }
+
+    (function watchCookie() {
+        let last = getCookie("cg_grade_updated");
+
+        const intervalId = setInterval(() => {
+            const now = getCookie("cg_grade_updated");
+            if (now !== last) {
+                last = now;
+                if (showUpdateNotice("cg_grade_updated", now)) {
+                    clearInterval(intervalId);
+                }
+            }
+        }, 500);
+    })();
+
+    async function sha256(text){
+        const uint8  = new TextEncoder().encode(text)
+        const digest = await crypto.subtle.digest('SHA-256', uint8)
+        return Array.from(new Uint8Array(digest)).map(v => v.toString(16).padStart(2,'0')).join('')
     }
 })();
