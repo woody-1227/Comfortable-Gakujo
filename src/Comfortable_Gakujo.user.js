@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Comfortable Gakujo
 // @namespace    http://tampermonkey.net/
-// @version      1.5.3
+// @version      1.5.4
 // @description  READMEを必ず読んでからご利用ください：https://github.com/woody-1227/Comfortable-Gakujo/blob/main/README.md
 // @author       woody_1227
 // @match        https://gakujo.shizuoka.ac.jp/*
@@ -17,7 +17,7 @@
 (function () {
     'use strict';
 
-    const version = "1.5.3";
+    const version = "1.5.4";
 
     function waitForDomStability({
         timeout = 10000,
@@ -112,108 +112,6 @@
     const deleteCookie = (name) => {
         document.cookie = `${name}=; max-age=0; path=/`;
     };
-
-    (function hookAllNetwork() {
-
-        const MAX_LOG_LENGTH = 3000;
-
-        const logResponse = (type, info) => {
-            console.groupCollapsed(
-                `%c[CG][${type}] ${info.method || ""} ${info.url}`,
-                "color:#1976d2;font-weight:bold"
-            );
-
-            if (info.status !== undefined) {
-                console.log("Status:", info.status);
-            }
-
-            if (info.requestBody) {
-                console.log("Request:", info.requestBody);
-            }
-
-            if (info.response !== undefined) {
-                if (typeof info.response === "string") {
-                    if (info.response.length > MAX_LOG_LENGTH) {
-                        console.log(
-                            "Response (truncated):",
-                            info.response.slice(0, MAX_LOG_LENGTH) + "..."
-                        );
-                    } else {
-                        console.log("Response:", info.response);
-                    }
-                } else {
-                    console.log("Response:", info.response);
-                }
-            }
-
-            console.groupEnd();
-        };
-
-        /******** fetch ********/
-        const _fetch = window.fetch;
-        window.fetch = async function (...args) {
-            const input = args[0];
-            const init = args[1] || {};
-            const url = input?.toString() ?? "";
-
-            const res = await _fetch.apply(this, args);
-
-            try {
-                const clone = res.clone();
-                clone.text().then(text => {
-                    let parsed = text;
-                    try {
-                        parsed = JSON.parse(text);
-                    } catch { }
-
-                    logResponse("fetch", {
-                        url,
-                        method: init.method || "GET",
-                        status: res.status,
-                        requestBody: init.body,
-                        response: parsed
-                    });
-                });
-            } catch (e) {
-                console.warn("[CG] fetch hook error", e);
-            }
-
-            return res;
-        };
-
-        /******** XMLHttpRequest ********/
-        const _open = XMLHttpRequest.prototype.open;
-        const _send = XMLHttpRequest.prototype.send;
-
-        XMLHttpRequest.prototype.open = function (method, url, ...rest) {
-            this._cg_method = method;
-            this._cg_url = url;
-            return _open.call(this, method, url, ...rest);
-        };
-
-        XMLHttpRequest.prototype.send = function (body) {
-            this._cg_requestBody = body;
-
-            this.addEventListener("load", () => {
-                let response = this.responseText;
-                try {
-                    response = JSON.parse(this.responseText);
-                } catch { }
-
-                logResponse("xhr", {
-                    url: this._cg_url,
-                    method: this._cg_method,
-                    status: this.status,
-                    requestBody: this._cg_requestBody,
-                    response
-                });
-            });
-
-            return _send.call(this, body);
-        };
-
-        console.log("[CG] Network ALL hook enabled");
-    })();
 
     const seenCharts = new WeakSet();
 
