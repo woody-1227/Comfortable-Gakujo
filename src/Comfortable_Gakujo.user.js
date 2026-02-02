@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Comfortable Gakujo
 // @namespace    http://tampermonkey.net/
-// @version      1.5.1
+// @version      1.5.2
 // @description  READMEを必ず読んでからご利用ください：https://github.com/woody-1227/Comfortable-Gakujo/blob/main/README.md
 // @author       woody_1227
 // @match        https://gakujo.shizuoka.ac.jp/*
@@ -308,6 +308,7 @@
     function showUpdateNotice() {
         if (getCookie("cg_grade_updated") !== "1") return (false);
         if (document.title !== "ホーム画面（学生・保護者）") return (false);
+        if (document.getElementsByClassName("cg-grade-notice-container").length > 0) return (false);
 
         const indexContainer = document.getElementsByClassName("index-container")[0];
         const cContents = indexContainer?.getElementsByClassName("c-contents")[0];
