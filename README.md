@@ -1,5 +1,5 @@
 # Comfortable-Gakujo
-[![version](https://github.com/woody-1227/Comfortable-Gakujo/raw/main/src/Comfortable_Gakujo.user.js)](https://github.com/woody-1227/Comfortable-Gakujo/)
+![version](https://img.shields.io/badge/version-1.6.1-green)
 
 ## 注意事項
 - 非公式の拡張機能です。
