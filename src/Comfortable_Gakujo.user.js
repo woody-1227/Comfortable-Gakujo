@@ -1,7 +1,7 @@
     // ==UserScript==
     // @name         Comfortable Gakujo
     // @namespace    http://tampermonkey.net/
-    // @version      1.6.0
+    // @version      1.6.1
     // @description  READMEを必ず読んでからご利用ください：https://github.com/woody-1227/Comfortable-Gakujo/blob/main/README.md
     // @author       woody_1227
     // @match        https://gakujo.shizuoka.ac.jp/*
@@ -17,7 +17,7 @@
     (function () {
         'use strict';
 
-        const version = "1.6.0";
+        const version = "1.6.1";
 
         function waitForDomStability({
             timeout = 10000,
@@ -73,6 +73,26 @@
         }
 
         window.addEventListener("load", async () => {
+            const step = sessionStorage.getItem("cg_grade_nav");
+
+            if (step === "dashboard") {
+                if (document.title === "成績ダッシュボード") {
+                    sessionStorage.setItem("cg_grade_nav", "detail");
+                    const btn = document.getElementsByClassName("c-btn-submit01")[0];
+                    btn.click();
+                } else {
+                    sessionStorage.removeItem("cg_grade_nav");
+                }
+            } else if (step === "detail") {
+                if (document.title === "成績情報") {
+                    sessionStorage.removeItem("cg_grade_nav");
+                    const btn = document.getElementsByClassName("c-btn-submit01")[1];
+                    btn.click();
+                } else {
+                    sessionStorage.removeItem("cg_grade_nav");
+                }
+            }
+
             try {
                 console.log("[CG] window load");
 
@@ -1017,6 +1037,7 @@
                     <a href="javascript:void(0);" onclick="javascript:ClearStorage(); javascript:postSubmit('emptyForm', 'SC_14002B00_01/init')" class="c-gnav-link cg-gnav-link"><i class="c-icon-uploaed" aria-hidden="true"></i>課題提出</a>
                     <a href="javascript:void(0);" onclick="javascript:ClearStorage(); javascript:postSubmit('emptyForm', 'SC_07002B00_01/initStudent')" class="c-gnav-link cg-gnav-link"><i class="c-icon-submission" aria-hidden="true"></i>履修登録</a>
                     <a href="javascript:void(0);" onclick="javascript:ClearStorage(); javascript:postSubmit('emptyForm', 'SC_15005B00_01/init')" class="c-gnav-link cg-gnav-link"><i class="c-icon-graph" aria-hidden="true"></i>成績</a>
+                    <a href="javascript:void(0);" onclick="javascript:ClearStorage(); javascript:sessionStorage.setItem('cg_grade_nav', 'dashboard'); javascript:postSubmit('emptyForm', 'SC_15005B00_01/init')" class="c-gnav-link cg-gnav-link"><i class="c-icon-check" aria-hidden="true"></i>単位情報</a>
                 `;
             }
         }
