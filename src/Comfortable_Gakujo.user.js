@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Comfortable Gakujo
 // @namespace    http://tampermonkey.net/
-// @version      1.6.2
+// @version      1.7.0
 // @description  READMEを必ず読んでからご利用ください：https://github.com/woody-1227/Comfortable-Gakujo/blob/main/README.md
 // @author       woody_1227
 // @match        https://gakujo.shizuoka.ac.jp/*
@@ -17,7 +17,7 @@
 (function () {
     'use strict';
 
-    const version = "1.6.2";
+    const version = "1.7.0";
     const updateURL = "https://github.com/woody-1227/Comfortable-Gakujo/raw/main/src/Comfortable_Gakujo.user.js";
 
     function waitForDomStability({
@@ -960,6 +960,41 @@
                     }
                 });
             }, 1000);
+
+            if (sessionStorage.getItem("cg_return_to_task") != null) {
+                const { title: taskTitle, subject: subjectName } = JSON.parse(sessionStorage.getItem("cg_return_to_task"));
+                sessionStorage.removeItem("cg_return_to_task");
+
+                const rows = document.querySelectorAll("#dataTable01 tbody tr");
+
+                console.log(`[CG] Returning to task: ${subjectName} - ${taskTitle}`);
+
+                for (const row of rows) {
+                    const subjectCell = row.querySelector('td[data-label^="講義名"]');
+                    const titleCell = row.querySelector('td[data-label="タイトル"]');
+
+                    if (!subjectCell || !titleCell) continue;
+
+                    const subjectText = subjectCell.innerText.split("\n")[0].trim();
+                    const titleText = titleCell.innerText.trim();
+
+                    if (subjectText.includes(subjectName) && titleText === taskTitle) {
+                        row.childNodes[1].click();
+                        return true;
+                    }
+                }
+            }
+        } else if (document.title === "課題・アンケート詳細") {
+            const btn = document.getElementsByClassName("c-btn-submit02")[0];
+            if (!btn || btn.dataset.cgHooked) return;
+
+            btn.dataset.cgHooked = "1";
+
+            btn.addEventListener("click", () => {
+                const title = document.getElementsByClassName("c-heading")[0].innerText.trim();
+                const subject = document.getElementsByClassName("submission_subject")[0].childNodes[3].innerText.trim();
+                sessionStorage.setItem("cg_return_to_task", JSON.stringify({ title, subject }));
+            }, true);
         } else if (document.title === "成績ダッシュボード" || document.title === "成績情報") {
             deleteCookie("cg_grade_updated");
         }
