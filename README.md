@@ -17,6 +17,14 @@ https://addons.mozilla.org/ja/firefox/addon/tampermonkey/
 ### 2. ブラウザで次のリンクにアクセスし、画面の指示に従って操作する
 https://github.com/woody-1227/Comfortable-Gakujo/raw/main/src/Comfortable_Gakujo.user.js
 
+### 3. アップデートについて
+Tampermonkeyの自動アップデートを利用できます。  
+ただし、自動アップデートを信頼しすぎないでください。  
+定期的な手動アップデートをおすすめします。  
+  
+手動でアップデートを行うには、下記のリンクに再度アクセスしてください。  
+https://github.com/woody-1227/Comfortable-Gakujo/raw/main/src/Comfortable_Gakujo.user.js
+
 ## 機能
 - 1~4の機能は「課題・アンケートリスト」のページにて自動実行されます。
 - 5の機能は「課題・アンケートリスト」のページにて利用可能です。
