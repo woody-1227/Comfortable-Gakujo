@@ -11,7 +11,7 @@
 ## インストール
 ### 1. ブラウザにTampermonkeyをインストールする
 > [!WARNING]
-> Chrome系ブラウザでTampermonkey拡張機能（バージョン5.3+）を使用する場合、「ユーザースクリプトを許可」トグル（Chrome 138+では拡張機能の設定から利用可能）または開発者モードのいずれかを有効にする必要があります。（ https://www.tampermonkey.net/faq.php#Q209 ）
+> Chrome系ブラウザでTampermonkey拡張機能（バージョン5.3+）を使用する場合、「ユーザースクリプトを許可」トグル（Chrome 138+では拡張機能の設定から利用可能）または開発者モードのいずれかを有効にする必要があります。（ https://www.tampermonkey.net/faq.php#Q209 ）  
 > Microsoft Edgeにおいては、「拡張機能」より、「開発者モード」を有効化し、Tampermonkeyの「詳細」から「ユーザースクリプトを許可する」を有効化する必要があります。
 - chrome ウェブストア  
 https://chromewebstore.google.com/detail/tampermonkey/dhdgffkkebhmkfjojejmpbldmpobfkfo?hl=ja  
