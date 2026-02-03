@@ -1,5 +1,6 @@
 # Comfortable-Gakujo
 ![version](https://img.shields.io/badge/version-1.6.1-green)
+![version](https://img.shields.io/badge/version-1.6.2-green)
 
 ## 注意事項
 - 非公式の拡張機能です。
@@ -134,3 +135,5 @@ __カウントダウンは、初めて表示してから1秒おきに更新を�
 - 「9. サイドバー」を追加
 ### 2026/02/03 ver1.6.1
 - 「9. サイドバー」において、「単位情報」へのリンクを追加
+### 2026/02/03 ver1.6.2
+- 「ホーム画面（学生・保護者）」に表示されるComfortable Gakujoのバージョン情報をクリックすることで、アップデートページに遷移するようにした

@@ -1,7 +1,7 @@
     // ==UserScript==
     // @name         Comfortable Gakujo
     // @namespace    http://tampermonkey.net/
-    // @version      1.6.1
+    // @version      1.6.2
     // @description  READMEを必ず読んでからご利用ください：https://github.com/woody-1227/Comfortable-Gakujo/blob/main/README.md
     // @author       woody_1227
     // @match        https://gakujo.shizuoka.ac.jp/*
@@ -17,7 +17,8 @@
     (function () {
         'use strict';
 
-        const version = "1.6.1";
+        const version = "1.6.2";
+        const updateURL = "https://github.com/woody-1227/Comfortable-Gakujo/raw/main/src/Comfortable_Gakujo.user.js";
 
         function waitForDomStability({
             timeout = 10000,
@@ -419,7 +420,7 @@
 
             if (document.title === "ホーム画面（学生・保護者）") {
                 const indexMainVisualUserLastLogin = document.getElementsByClassName("index-main-visual-user-last-login")[0];
-                indexMainVisualUserLastLogin.innerHTML += ` | <span style="display: inline-block;">Comfortable Gakujo v${version}</span>`;
+                indexMainVisualUserLastLogin.innerHTML += ` | <a href="${updateURL}" title="Comfortable Gakujo をアップデート"><span style="display: inline-block; text-decoration: underline; color: blue"">Comfortable Gakujo v${version}</span></a>`;
 
                 const waitForCountElement = new MutationObserver((mutations, obs) => {
                     const countElement = document.getElementsByClassName("count")[0];
