@@ -1,5 +1,4 @@
 # Comfortable-Gakujo
-![version](https://img.shields.io/badge/version-1.6.1-green)
 ![version](https://img.shields.io/badge/version-1.6.2-green)
 
 ## 注意事項
