@@ -12,10 +12,14 @@
 ### 1. ブラウザにTampermonkeyをインストールする
 > [!WARNING]
 > Chrome系ブラウザでTampermonkey拡張機能（バージョン5.3+）を使用する場合、「ユーザースクリプトを許可」トグル（Chrome 138+では拡張機能の設定から利用可能）または開発者モードのいずれかを有効にする必要があります。（ https://www.tampermonkey.net/faq.php#Q209 ）
+> Microsoft Edgeにおいては、「拡張機能」より、「開発者モード」を有効化し、Tampermonkeyの「詳細」から「ユーザースクリプトを許可する」を有効化する必要があります。
 - chrome ウェブストア  
 https://chromewebstore.google.com/detail/tampermonkey/dhdgffkkebhmkfjojejmpbldmpobfkfo?hl=ja  
 - Firefox Browser ADD-ONS  
 https://addons.mozilla.org/ja/firefox/addon/tampermonkey/
+- Microsoft Edge Addons
+https://microsoftedge.microsoft.com/addons/detail/tampermonkey/iikmkjmpaadaobahmlepeloendndfphd?hl=ja-JP
+
 ### 2. ブラウザで次のリンクにアクセスし、画面の指示に従って操作する
 https://github.com/woody-1227/Comfortable-Gakujo/raw/main/src/Comfortable_Gakujo.user.js
 
