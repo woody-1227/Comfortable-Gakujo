@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Comfortable Gakujo
 // @namespace    http://tampermonkey.net/
-// @version      1.7.0
+// @version      1.8.0
 // @description  READMEを必ず読んでからご利用ください：https://github.com/woody-1227/Comfortable-Gakujo/blob/main/README.md
 // @author       woody_1227
 // @match        https://gakujo.shizuoka.ac.jp/*
@@ -17,7 +17,7 @@
 (function () {
     'use strict';
 
-    const version = "1.7.0";
+    const version = "1.8.0";
     const updateURL = "https://github.com/woody-1227/Comfortable-Gakujo/raw/main/src/Comfortable_Gakujo.user.js";
 
     function waitForDomStability({
@@ -418,6 +418,67 @@
             });
         };
 
+        function cropHeaderImage(img) {
+            const TARGET_W = 1500;
+            const TARGET_H = 230;
+            const TARGET_RATIO = TARGET_W / TARGET_H;
+
+            let srcW = img.width;
+            let srcH = img.height;
+
+            let cropW, cropH;
+
+            if (srcW >= TARGET_W && srcH >= TARGET_H) {
+
+                const srcRatio = srcW / srcH;
+
+                if (srcRatio > TARGET_RATIO) {
+                    cropH = srcH;
+                    cropW = Math.round(cropH * TARGET_RATIO);
+                } else {
+                    cropW = srcW;
+                    cropH = Math.round(cropW / TARGET_RATIO);
+                }
+
+            }
+            else {
+                const srcRatio = srcW / srcH;
+
+                if (srcRatio > TARGET_RATIO) {
+                    cropH = srcH;
+                    cropW = Math.round(cropH * TARGET_RATIO);
+                } else {
+                    cropW = srcW;
+                    cropH = Math.round(cropW / TARGET_RATIO);
+                }
+            }
+
+            const cropX = Math.floor((srcW - cropW) / 2);
+            const cropY = Math.floor((srcH - cropH) / 2);
+
+            let outW = cropW;
+            let outH = cropH;
+
+            if (cropW >= TARGET_W && cropH >= TARGET_H) {
+                outW = TARGET_W;
+                outH = TARGET_H;
+            }
+
+            const canvas = document.createElement("canvas");
+            canvas.width = outW;
+            canvas.height = outH;
+
+            const ctx = canvas.getContext("2d");
+            ctx.drawImage(
+                img,
+                cropX, cropY, cropW, cropH,
+                0, 0, outW, outH
+            );
+
+            return canvas;
+        }
+
+
         if (document.title === "ホーム画面（学生・保護者）") {
             const indexMainVisualUserLastLogin = document.getElementsByClassName("index-main-visual-user-last-login")[0];
             indexMainVisualUserLastLogin.innerHTML += ` | <a href="${updateURL}" title="Comfortable Gakujo をアップデート"><span style="display: inline-block; text-decoration: underline; color: blue"">Comfortable Gakujo v${version}</span></a>`;
@@ -657,6 +718,104 @@
                         deleteCookie("cg_grade_updated");
                         document.getElementsByClassName("cg-grade-notice-container")[0]?.remove();
                     }
+                }
+            });
+
+            const indexMainVisualBg = document.getElementsByClassName("index-main-visual-bg")[0];
+            const savedImage = localStorage.getItem("cg-header-image");
+
+            if (savedImage) {
+                indexMainVisualBg.style.backgroundImage = `url(${savedImage})`;
+            }
+
+            const contents = document.getElementsByClassName("index-main-visual")[0];
+            if (!contents || document.getElementById("cg-header-uploader")) return;
+
+            const uploaderWrapper = document.createElement("div");
+            uploaderWrapper.id = "cg-header-uploader";
+            uploaderWrapper.style.position = "absolute";
+            uploaderWrapper.style.top = "1rem";
+            uploaderWrapper.style.right = "1rem";
+            uploaderWrapper.style.zIndex = "20";
+
+            uploaderWrapper.style.width = "fit-content";
+
+            const uploadBtn = document.createElement("button");
+            uploadBtn.type = "button";
+            uploadBtn.id = "cg-header-uploader-btn";
+            uploadBtn.className = "c-btn c-btn-line";
+            uploadBtn.style.minWidth = "auto";
+            uploadBtn.style.display = "inline-block";
+            uploadBtn.innerHTML = `
+                <span class="c-btn-link">
+                    <i class="c-icon-edit" style="margin: 0;" aria-hidden="true"></i>
+                </span>
+            `;
+
+            const removeBtn = document.createElement("button");
+            removeBtn.type = "button";
+            removeBtn.id = "cg-header-remove-btn";
+            removeBtn.className = "c-btn c-btn-line";
+            removeBtn.style.marginLeft = "0.5rem";
+            removeBtn.style.minWidth = "auto";
+            removeBtn.style.display = "inline-block";
+            removeBtn.innerHTML = `
+                <span class="c-btn-link">
+                    <i class="c-icon-close" style="margin: 0;" aria-hidden="true"></i>
+                </span>
+            `;
+
+            const fileInput = document.createElement("input");
+            fileInput.type = "file";
+            fileInput.id = "cg-header-file";
+            fileInput.accept = ".png,.jpg,.jpeg,.gif";
+            fileInput.hidden = true;
+
+            uploadBtn.addEventListener("click", (e) => {
+                fileInput.click();
+            }, true);
+
+            uploaderWrapper.appendChild(uploadBtn);
+            uploaderWrapper.appendChild(removeBtn);
+            uploaderWrapper.appendChild(fileInput);
+            contents.appendChild(uploaderWrapper);
+
+            fileInput.addEventListener("change", (event) => {
+                const file = event.target.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        const canvas = cropHeaderImage(img);
+                        const base64 = canvas.toDataURL("image/png");
+                        const sizeMB = base64.length / (1024 * 1024);
+
+                        if (sizeMB > 3) {
+                            alert("画像サイズは3MB以下にしてください");
+                            return;
+                        }
+
+                        localStorage.setItem("cg-header-image", base64);
+
+                        const bg = document.getElementsByClassName("index-main-visual-bg")[0];
+                        if (bg) {
+                            bg.style.backgroundImage = `url(${base64})`;
+                        }
+
+                        console.log("[CG] Header image updated");
+                    };
+                    img.src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            });
+
+            removeBtn.addEventListener("click", (e) => {
+                localStorage.removeItem("cg-header-image");
+                const bg = document.getElementsByClassName("index-main-visual-bg")[0];
+                if (bg) {
+                    bg.style.backgroundImage = `url(./img/bg_mv01.jpg)`;
                 }
             });
         } else if (document.title === "課題・アンケートリスト") {
@@ -997,6 +1156,35 @@
             }, true);
         } else if (document.title === "成績ダッシュボード" || document.title === "成績情報") {
             deleteCookie("cg_grade_updated");
+        } else if (document.title === "連絡一覧") {
+            const cPageNation = document.getElementsByClassName("c-pagination")[0];
+            if (cPageNation) {
+                const markAsRead = document.createElement('div');
+                markAsRead.className = "c-filter_box c-form-box";
+                markAsRead.style.left = "20px";
+                markAsRead.innerHTML = `<button type="button" id="cg-mark-as-read" dialogtype="" reportoutputconfirm="true" loading="true" class="c-btn c-btn-submit01" filetype="null"><span class="c-btn-link"><span class="c-btn-text ">すべて既読にする</span></span></button>`;
+                cPageNation.childNodes[0].insertBefore(markAsRead, cPageNation.childNodes[0].firstChild);
+
+                document.getElementById("cg-mark-as-read").addEventListener("click", () => {
+                    const lengthSelect = document.querySelector('select[name="dataTable01_length"]');
+                    if (lengthSelect) {
+                        lengthSelect.value = "-1";
+                        lengthSelect.dispatchEvent(new Event("change", { bubbles: true }));
+                        setTimeout(() => {
+                            const checkAll = document.getElementById("checkAllId");
+                            if (checkAll) {
+                                checkAll.click();
+                                setTimeout(() => {
+                                    const cBtnSubmit01 = document.getElementsByClassName("c-btn-submit01")[1];
+                                    if (cBtnSubmit01) {
+                                        cBtnSubmit01.click();
+                                    }
+                                }, 500);
+                            }
+                        }, 500);
+                    }
+                });
+            }
         }
 
         if (location.hostname === "idp.shizuoka.ac.jp") {
