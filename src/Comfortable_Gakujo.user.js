@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Comfortable Gakujo
 // @namespace    http://tampermonkey.net/
-// @version      1.8.0
+// @version      1.8.1
 // @description  READMEを必ず読んでからご利用ください：https://github.com/woody-1227/Comfortable-Gakujo/blob/main/README.md
 // @author       woody_1227
 // @match        https://gakujo.shizuoka.ac.jp/*
@@ -17,7 +17,7 @@
 (function () {
     'use strict';
 
-    const version = "1.8.0";
+    const version = "1.8.1";
     const updateURL = "https://github.com/woody-1227/Comfortable-Gakujo/raw/main/src/Comfortable_Gakujo.user.js";
 
     function waitForDomStability({
@@ -809,6 +809,8 @@
                     img.src = e.target.result;
                 };
                 reader.readAsDataURL(file);
+
+                fileInput.value = "";
             });
 
             removeBtn.addEventListener("click", (e) => {
