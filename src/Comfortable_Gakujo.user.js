@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Comfortable Gakujo
 // @namespace    http://tampermonkey.net/
-// @version      1.8.1
+// @version      1.9.0
 // @description  READMEを必ず読んでからご利用ください：https://github.com/woody-1227/Comfortable-Gakujo/blob/main/README.md
 // @author       woody_1227
 // @match        https://gakujo.shizuoka.ac.jp/*
@@ -17,7 +17,7 @@
 (function () {
     'use strict';
 
-    const version = "1.8.1";
+    const version = "1.9.0";
     const updateURL = "https://github.com/woody-1227/Comfortable-Gakujo/raw/main/src/Comfortable_Gakujo.user.js";
 
     function waitForDomStability({
@@ -236,7 +236,7 @@
 
         const notice = document.createElement("div");
         notice.className = "cg-grade-notice-container";
-        notice.innerHTML = `<button class="cg-grade-notice-button c-main-menu-btn" onclick="showLoading();postSubmit('SC_01002B00_Form', 'SC_01002B00_01/indexDashbordSeeMore')"><i class="c-icon-notice" aria-hidden="true" style="margin-right: 0.5em"></i>成績が更新されました</button>`;
+        notice.innerHTML = `<button class="cg-grade-notice-button c-main-menu-btn" onclick="showLoading();postSubmit('SC_01002B00_Form', 'SC_01002B00_01/studentRecordAnnouncementContentsLink')"><i class="c-icon-notice" aria-hidden="true" style="margin-right: 0.5em"></i>成績が更新されました</button>`;
 
         const style = document.createElement('style');
         style.textContent = `
@@ -1156,8 +1156,154 @@
                 const subject = document.getElementsByClassName("submission_subject")[0].childNodes[3].innerText.trim();
                 sessionStorage.setItem("cg_return_to_task", JSON.stringify({ title, subject }));
             }, true);
-        } else if (document.title === "成績ダッシュボード" || document.title === "成績情報") {
+        } else if (document.title === "成績ダッシュボード") {
             deleteCookie("cg_grade_updated");
+        } else if (document.title === "成績情報") {
+            deleteCookie("cg_grade_updated");
+
+            function collectYearSemesters() {
+                const years = new Set();
+                const yearSemesters = new Set();
+
+                const table = document.getElementById("02");
+                if (!table) return { years: [], yearSemesters: [] };
+
+                table.querySelectorAll("tbody tr").forEach(tr => {
+                    const cell = tr.querySelector('td[data-label="成績報告時期"]');
+                    const text = cell?.innerText.trim();
+                    if (!text) return;
+
+                    const m = text.match(/(\d{4})年度\s*(前期|後期)/);
+                    if (!m) return;
+
+                    years.add(m[1]);
+                    yearSemesters.add(`${m[1]}-${m[2]}`);
+                });
+
+                return {
+                    years: Array.from(years).sort(),
+                    yearSemesters: Array.from(yearSemesters).sort((a, b) => {
+                        const [ya, sa] = a.split("-");
+                        const [yb, sb] = b.split("-");
+                        if (ya !== yb) return ya - yb;
+                        return sa === "前期" ? -1 : 1;
+                    })
+                };
+            }
+
+            function applyYearSemesterFilter(value) {
+                const table = document.getElementById("02");
+                if (!table) return;
+
+                table.querySelectorAll("tbody tr").forEach(tr => {
+                    const cell = tr.querySelector('td[data-label="成績報告時期"]');
+                    const text = cell?.innerText || "";
+
+                    if (value === "all") {
+                        tr.style.display = "";
+                        return;
+                    }
+
+                    if (/^\d{4}$/.test(value)) {
+                        tr.style.display = text.includes(`${value}年度`) ? "" : "none";
+                        return;
+                    }
+
+                    const [y, s] = value.split("-");
+                    tr.style.display =
+                        text.includes(`${y}年度`) && text.includes(s)
+                            ? ""
+                            : "none";
+                });
+            }
+
+            function getDefaultYearSemester() {
+                const now = new Date();
+                const year = now.getFullYear();
+                const month = now.getMonth() + 1;
+
+                if (month >= 2 && month <= 7) {
+                    return `${year - 1}-後期`;
+                }
+
+                if (month >= 8) {
+                    return `${year}-前期`;
+                }
+
+                return `${year - 1}-前期`;
+            }
+
+            function initYearSemesterFilter() {
+                const table = document.getElementById("02");
+                if (!table) return;
+
+                const upper = document.getElementsByClassName("seiseki-marker-contents-body")[0];
+                if (!upper) return;
+                if (document.getElementById("cg-year-semester-box")) return;
+
+                const { years, yearSemesters } = collectYearSemesters();
+                if (years.length === 0) return;
+
+                upper.style.display = "flex";
+                upper.style.justifyContent = "space-between";
+
+                const box = document.createElement("div");
+                box.className = "c-form-box u-w100per-sp";
+                box.id = "cg-year-semester-box";
+
+                box.appendChild(document.createTextNode("年度・期："));
+
+                const wrapper = document.createElement("div");
+                wrapper.className = "select_wrapper u-w100per-sp";
+
+                const select = document.createElement("select");
+                select.className = "select u-w260-pc u-w100per-sp js-select";
+
+                select.appendChild(new Option("すべて表示", "all"));
+
+                years.forEach(y => {
+                    select.appendChild(new Option(`${y}年度`, y));
+                });
+
+                yearSemesters.forEach(v => {
+                    const [y, s] = v.split("-");
+                    select.appendChild(new Option(`${y}年度 ${s}`, v));
+                });
+
+                select.addEventListener("change", () => {
+                    applyYearSemesterFilter(select.value);
+                });
+
+                wrapper.appendChild(select);
+                box.appendChild(wrapper);
+                upper.appendChild(box);
+
+                const defaultValue = getDefaultYearSemester();
+
+                if ([...select.options].some(o => o.value === defaultValue)) {
+                    select.value = defaultValue;
+                    applyYearSemesterFilter(defaultValue);
+                } else {
+                    applyYearSemesterFilter("all");
+                }
+
+                console.log("[CG] Year/Semester filter initialized");
+            }
+
+            const waitTable = new MutationObserver((_m, obs) => {
+                const table = document.getElementById("02");
+                const tbody = table?.querySelector("tbody tr");
+                if (table && tbody) {
+                    obs.disconnect();
+                    initYearSemesterFilter();
+                    const reportDate = document.getElementById("reportDate");
+                    if (reportDate) {
+                        reportDate.click();
+                    }
+                }
+            });
+
+            waitTable.observe(document.body, { childList: true, subtree: true });
         } else if (document.title === "連絡一覧") {
             const cPageNation = document.getElementsByClassName("c-pagination")[0];
             if (cPageNation) {
