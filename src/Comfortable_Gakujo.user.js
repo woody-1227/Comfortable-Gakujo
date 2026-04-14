@@ -498,7 +498,17 @@
             waitForCountElement.observe(document.body, { childList: true, subtree: true });
             showUpdateNotice();
 
-            const mediumSizeItems = document.getElementById("mediumSizeItems");
+            const indexMainVisualNotice = document.getElementsByClassName("index-main-visual-notice")[0];
+            if (!indexMainVisualNotice.querySelector(".index-main-visual-notice-other")) {
+                const indexMainVisualNoticeOther = document.createElement("div");
+                indexMainVisualNoticeOther.className = "index-main-visual-notice-other";
+                const ul = document.createElement("ul");
+                ul.className = "index-notice-other-items";
+                indexMainVisualNoticeOther.appendChild(ul);
+                indexMainVisualNotice.appendChild(indexMainVisualNoticeOther);
+            }
+
+            const indexNoticeOtherItems = document.getElementsByClassName("index-notice-other-items")[0];
             const li = document.createElement('li');
             li.className = 'index-notice-other-item';
             if (getCookie("cg_grade_save_enabled") === "1") {
@@ -693,7 +703,7 @@
                 }
                 `;
             document.head.appendChild(style);
-            mediumSizeItems.appendChild(li);
+            indexNoticeOtherItems.appendChild(li);
 
             window.addEventListener('change', (e) => {
                 if (e.target.id === 'cg-grade-save-toggle') {
