@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Comfortable Gakujo
 // @namespace    http://tampermonkey.net/
-// @version      1.9.2
+// @version      1.10.0
 // @description  READMEを必ず読んでからご利用ください：https://github.com/woody-1227/Comfortable-Gakujo/blob/main/README.md
 // @author       woody_1227
 // @match        https://gakujo.shizuoka.ac.jp/*
@@ -17,7 +17,7 @@
 (function () {
     'use strict';
 
-    const version = "1.9.2";
+    const version = "1.10.0";
     const updateURL = "https://github.com/woody-1227/Comfortable-Gakujo/raw/main/src/Comfortable_Gakujo.user.js";
 
     function waitForDomStability({
@@ -1145,15 +1145,16 @@
             }
         } else if (document.title === "課題・アンケート詳細") {
             const btn = document.getElementsByClassName("c-btn-submit02")[0];
-            if (!btn || btn.dataset.cgHooked) return;
+            if (btn && !btn.dataset.cgHooked) {
+                btn.dataset.cgHooked = "1";
+                btn.addEventListener("click", () => {
+                    const title = document.getElementsByClassName("c-heading")[0].innerText.trim();
+                    const subject = document.getElementsByClassName("submission_subject")[0].childNodes[3].innerText.trim();
+                    sessionStorage.setItem("cg_return_to_task", JSON.stringify({ title, subject }));
+                }, true);
+            }
 
-            btn.dataset.cgHooked = "1";
 
-            btn.addEventListener("click", () => {
-                const title = document.getElementsByClassName("c-heading")[0].innerText.trim();
-                const subject = document.getElementsByClassName("submission_subject")[0].childNodes[3].innerText.trim();
-                sessionStorage.setItem("cg_return_to_task", JSON.stringify({ title, subject }));
-            }, true);
         } else if (document.title === "成績ダッシュボード") {
             deleteCookie("cg_grade_updated");
         } else if (document.title === "成績情報") {
@@ -1351,6 +1352,149 @@
                 btn.click();
             }
         }
+
+        const fileLinks = Array.from(document.querySelectorAll("a")).filter(a => {
+            const text = a.innerText.toLowerCase();
+            const href = (a.href || "").toLowerCase();
+            return text.includes(".pdf") || href.includes(".pdf") || text.includes(".txt") || href.includes(".txt");
+        });
+
+        fileLinks.forEach(link => {
+            if (link.dataset.cgFilePreviewed) return;
+            link.dataset.cgFilePreviewed = "1";
+
+            const wrapper = document.createElement("div");
+            wrapper.className = "cg-preview-wrapper";
+            wrapper.style.marginTop = "10px";
+            wrapper.style.marginBottom = "20px";
+            wrapper.style.width = "100%";
+            wrapper.style.border = "1px solid #ccc";
+            wrapper.style.borderRadius = "4px";
+            wrapper.style.overflow = "hidden";
+            wrapper.style.display = "none";
+
+            const iframe = document.createElement("iframe");
+            iframe.style.width = "100%";
+            iframe.style.height = "600px";
+            iframe.style.border = "none";
+            iframe.style.display = "block";
+            iframe.src = "about:blank";
+            wrapper.appendChild(iframe);
+
+            const insertWrapper = (shouldScroll) => {
+                const historyBlock = link.closest(".histry-my-block, .history-my-block");
+                if (historyBlock) {
+                    historyBlock.appendChild(wrapper);
+                } else {
+                    const blockParent = link.closest("table, ul, dl, .c-form-box, .c-contents-body");
+                    const insertTarget = blockParent ? blockParent : link;
+
+                    let next = insertTarget.nextSibling;
+                    while (next && next.classList && next.classList.contains("cg-preview-wrapper")) {
+                        next = next.nextSibling;
+                    }
+                    if (next) {
+                        insertTarget.parentNode.insertBefore(wrapper, next);
+                    } else {
+                        insertTarget.parentNode.appendChild(wrapper);
+                    }
+                }
+
+                if (shouldScroll) {
+                    setTimeout(() => wrapper.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100);
+                }
+            };
+
+            if (link.href && link.href.startsWith("javascript:")) {
+                iframe.name = "file_preview_" + Math.random().toString(36).substr(2, 9);
+
+                const previewBtn = document.createElement("button");
+                previewBtn.innerText = "ファイルをプレビュー";
+                previewBtn.type = "button";
+                previewBtn.className = "c-btn c-btn-line c-btn-sm";
+                previewBtn.style.marginTop = "5px";
+                previewBtn.style.marginBottom = "5px";
+                previewBtn.style.display = "block";
+
+                previewBtn.addEventListener("click", () => {
+                    wrapper.style.display = "block";
+                    previewBtn.style.display = "none";
+                    insertWrapper(true);
+
+                    const doc = iframe.contentDocument || iframe.contentWindow.document;
+                    if (doc) doc.body.innerHTML = "<div style='font-family: sans-serif; padding: 20px;'>読み込み中...</div>";
+
+                    const originalJqSubmit = window.jQuery ? window.jQuery.fn.submit : null;
+                    const originalNativeSubmit = HTMLFormElement.prototype.submit;
+                    let submittedForm = null;
+
+                    if (originalJqSubmit) {
+                        window.jQuery.fn.submit = function () {
+                            submittedForm = this[0];
+                            return this;
+                        };
+                    }
+                    HTMLFormElement.prototype.submit = function () {
+                        submittedForm = this;
+                    };
+
+                    link.click();
+
+                    setTimeout(async () => {
+                        if (originalJqSubmit) window.jQuery.fn.submit = originalJqSubmit;
+                        HTMLFormElement.prototype.submit = originalNativeSubmit;
+
+                        if (typeof isSubmit !== 'undefined') window.isSubmit = false;
+                        if (typeof closeLoading === 'function') window.closeLoading();
+
+                        if (submittedForm) {
+                            try {
+                                const formData = new FormData(submittedForm);
+                                const response = await fetch(submittedForm.action, {
+                                    method: submittedForm.method || "POST",
+                                    body: formData
+                                });
+                                const blob = await response.blob();
+                                let type = blob.type;
+                                if (link.innerText.toLowerCase().includes(".pdf")) type = "application/pdf";
+                                else if (link.innerText.toLowerCase().includes(".txt")) type = "text/plain";
+
+                                const newBlob = new Blob([blob], { type: type });
+                                iframe.src = URL.createObjectURL(newBlob);
+                            } catch (e) {
+                                const doc2 = iframe.contentDocument || iframe.contentWindow.document;
+                                if (doc2) doc2.body.innerHTML = "<div style='font-family: sans-serif; padding: 20px; color: red;'>読み込みに失敗しました。</div>";
+                            }
+                        } else {
+                            const doc2 = iframe.contentDocument || iframe.contentWindow.document;
+                            if (doc2) doc2.body.innerHTML = "<div style='font-family: sans-serif; padding: 20px; color: red;'>フォームの送信を検知できませんでした。</div>";
+                        }
+                    }, 50);
+                });
+
+                link.parentNode.insertBefore(previewBtn, link.nextSibling);
+            } else {
+                wrapper.style.display = "block";
+                insertWrapper(false);
+
+                const doc = iframe.contentDocument || iframe.contentWindow.document;
+                if (doc) doc.body.innerHTML = "<div style='font-family: sans-serif; padding: 20px;'>読み込み中...</div>";
+
+                fetch(link.href)
+                    .then(res => res.blob())
+                    .then(blob => {
+                        let type = blob.type;
+                        if (link.href.toLowerCase().includes(".pdf") || link.innerText.toLowerCase().includes(".pdf")) type = "application/pdf";
+                        else if (link.href.toLowerCase().includes(".txt") || link.innerText.toLowerCase().includes(".txt")) type = "text/plain";
+                        const newBlob = new Blob([blob], { type: type });
+                        iframe.src = URL.createObjectURL(newBlob);
+                    })
+                    .catch(e => {
+                        const doc2 = iframe.contentDocument || iframe.contentWindow.document;
+                        if (doc2) doc2.body.innerHTML = "<div style='font-family: sans-serif; padding: 20px; color: red;'>読み込みに失敗しました。</div>";
+                    });
+            }
+        });
 
         const cMainMenu = document.getElementsByClassName("c-main-menu")[0];
         if (cMainMenu) {
