@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Comfortable Gakujo
 // @namespace    http://tampermonkey.net/
-// @version      1.10.0
+// @version      1.10.1
 // @description  READMEを必ず読んでからご利用ください：https://github.com/woody-1227/Comfortable-Gakujo/blob/main/README.md
 // @author       woody_1227
 // @match        https://gakujo.shizuoka.ac.jp/*
@@ -17,7 +17,7 @@
 (function () {
     'use strict';
 
-    const version = "1.10.0";
+    const version = "1.10.1";
     const updateURL = "https://github.com/woody-1227/Comfortable-Gakujo/raw/main/src/Comfortable_Gakujo.user.js";
 
     function waitForDomStability({
@@ -1353,11 +1353,25 @@
             }
         }
 
-        const fileLinks = Array.from(document.querySelectorAll("a")).filter(a => {
-            const text = a.innerText.toLowerCase();
-            const href = (a.href || "").toLowerCase();
-            return text.includes(".pdf") || href.includes(".pdf") || text.includes(".txt") || href.includes(".txt");
-        });
+        const previewMimeTypes = {
+            pdf: "application/pdf",
+            txt: "text/plain",
+            png: "image/png",
+            jpg: "image/jpeg",
+            jpeg: "image/jpeg",
+            gif: "image/gif",
+            webp: "image/webp",
+            bmp: "image/bmp",
+            avif: "image/avif"
+        };
+        const getPreviewType = link => {
+            const extensionPattern = /\.(pdf|txt|png|jpe?g|gif|webp|bmp|avif)(?=$|[\s?#&])/i;
+            const textMatch = link.innerText.trim().match(extensionPattern);
+            const hrefMatch = (link.href || "").match(extensionPattern);
+            const match = textMatch || hrefMatch;
+            return match ? previewMimeTypes[match[1].toLowerCase()] : null;
+        };
+        const fileLinks = Array.from(document.querySelectorAll("a")).filter(a => getPreviewType(a));
 
         fileLinks.forEach(link => {
             if (link.dataset.cgFilePreviewed) return;
@@ -1380,6 +1394,29 @@
             iframe.style.display = "block";
             iframe.src = "about:blank";
             wrapper.appendChild(iframe);
+
+            const showPreview = blob => {
+                const type = getPreviewType(link) || blob.type;
+                const url = URL.createObjectURL(new Blob([blob], { type }));
+                if (type.startsWith("image/")) {
+                    const image = document.createElement("img");
+                    image.alt = link.innerText.trim();
+                    image.style.display = "block";
+                    image.style.maxWidth = "100%";
+                    image.style.maxHeight = "600px";
+                    image.style.width = "auto";
+                    image.style.height = "auto";
+                    image.style.margin = "0 auto";
+                    image.onload = image.onerror = () => URL.revokeObjectURL(url);
+                    image.src = url;
+                    iframe.style.display = "none";
+                    wrapper.style.width = "fit-content";
+                    wrapper.style.maxWidth = "100%";
+                    wrapper.appendChild(image);
+                } else {
+                    iframe.src = url;
+                }
+            };
 
             const insertWrapper = (shouldScroll) => {
                 const historyBlock = link.closest(".histry-my-block, .history-my-block");
@@ -1455,12 +1492,7 @@
                                     body: formData
                                 });
                                 const blob = await response.blob();
-                                let type = blob.type;
-                                if (link.innerText.toLowerCase().includes(".pdf")) type = "application/pdf";
-                                else if (link.innerText.toLowerCase().includes(".txt")) type = "text/plain";
-
-                                const newBlob = new Blob([blob], { type: type });
-                                iframe.src = URL.createObjectURL(newBlob);
+                                showPreview(blob);
                             } catch (e) {
                                 const doc2 = iframe.contentDocument || iframe.contentWindow.document;
                                 if (doc2) doc2.body.innerHTML = "<div style='font-family: sans-serif; padding: 20px; color: red;'>読み込みに失敗しました。</div>";
@@ -1483,11 +1515,7 @@
                 fetch(link.href)
                     .then(res => res.blob())
                     .then(blob => {
-                        let type = blob.type;
-                        if (link.href.toLowerCase().includes(".pdf") || link.innerText.toLowerCase().includes(".pdf")) type = "application/pdf";
-                        else if (link.href.toLowerCase().includes(".txt") || link.innerText.toLowerCase().includes(".txt")) type = "text/plain";
-                        const newBlob = new Blob([blob], { type: type });
-                        iframe.src = URL.createObjectURL(newBlob);
+                        showPreview(blob);
                     })
                     .catch(e => {
                         const doc2 = iframe.contentDocument || iframe.contentWindow.document;
