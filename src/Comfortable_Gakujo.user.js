@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Comfortable Gakujo
 // @namespace    http://tampermonkey.net/
-// @version      1.11.0
+// @version      1.11.1
 // @description  READMEを必ず読んでからご利用ください：https://github.com/woody-1227/Comfortable-Gakujo/blob/main/README.md
 // @author       woody_1227
 // @match        https://gakujo.shizuoka.ac.jp/*
@@ -17,14 +17,14 @@
 (function () {
     'use strict';
 
-    const version = "1.11.0";
+    const version = "1.11.1";
     const updateURL = "https://github.com/woody-1227/Comfortable-Gakujo/raw/main/src/Comfortable_Gakujo.user.js";
 
     function waitForDomStability({
         timeout = 10000,
         stableTime = 500
     } = {}) {
-        return new Promise((resolve, reject) => {
+        return new Promise(resolve => {
             let lastMutation = Date.now();
 
             const observer = new MutationObserver(() => {
@@ -46,9 +46,10 @@
                     resolve();
                 } else if (now - start > timeout) {
                     observer.disconnect();
-                    reject(new Error("DOM stability timeout"));
+                    console.debug("[CG] DOM keeps updating; continue initialization");
+                    resolve();
                 } else {
-                    requestAnimationFrame(check);
+                    setTimeout(check, 50);
                 }
             };
 
@@ -73,10 +74,21 @@
         });
     }
 
-    window.addEventListener("load", async () => {
-        sessionStorage.removeItem("cg_grade_nav");
+    // Check existing content as well as future mutations.
+    function observeUntilReady(check) {
+        const observer = new MutationObserver(() => {
+            if (check()) observer.disconnect();
+        });
+        observer.observe(document.body, { childList: true, subtree: true });
+        if (check()) observer.disconnect();
+    }
 
+    let initializationStarted = false;
+    async function initializeComfortableGakujo() {
+        if (initializationStarted) return;
+        initializationStarted = true;
         try {
+            sessionStorage.removeItem("cg_grade_nav");
             console.log("[CG] window load");
 
             await waitForDomStability();
@@ -98,7 +110,13 @@
         } catch (e) {
             console.warn("[CG] initialization failed:", e);
         }
-    });
+    }
+
+    if (document.readyState === "complete") {
+        setTimeout(initializeComfortableGakujo, 0);
+    } else {
+        window.addEventListener("load", initializeComfortableGakujo, { once: true });
+    }
 
     const setCookie = (name, value, days = 365) => {
         const expires = new Date(Date.now() + days * 864e5).toUTCString();
@@ -797,7 +815,7 @@
             const indexMainVisualUserLastLogin = document.getElementsByClassName("index-main-visual-user-last-login")[0];
             indexMainVisualUserLastLogin.innerHTML += ` | <a href="${updateURL}" title="Comfortable Gakujo をアップデート"><span style="display: inline-block; text-decoration: underline; color: blue"">Comfortable Gakujo v${version}</span></a>`;
 
-            const waitForCountElement = new MutationObserver((mutations, obs) => {
+            observeUntilReady(() => {
                 const countElement = document.getElementsByClassName("count")[0];
                 if (countElement) {
                     const countText = countElement.innerText;
@@ -806,7 +824,6 @@
                     if (match) {
                         originalCount = parseInt(match[1], 10);
                     }
-                    obs.disconnect();
                     const hiddenTasks = getHiddenTasks();
                     const now = new Date();
                     let hiddenCount = 0;
@@ -819,9 +836,10 @@
                     if (hiddenCount > 0) {
                         countElement.innerHTML = `<span class="num">${originalCount - hiddenCount}</span>件 + <span style="color: gray;">${hiddenCount}件</span>`;
                     }
+                    return true;
                 }
+                return false;
             });
-            waitForCountElement.observe(document.body, { childList: true, subtree: true });
             showUpdateNotice();
             void checkGradeUpdates();
             setInterval(() => {
@@ -1386,6 +1404,10 @@
 
                 if (!lengthSelect || !tbody) return;
 
+                if (lengthSelect.value === "-1") {
+                    processTable();
+                    return;
+                }
                 const observer = new MutationObserver((mutations, obs) => {
                     for (const m of mutations) {
                         if (m.type === 'childList' && (m.addedNodes.length || m.removedNodes.length)) {
@@ -1403,18 +1425,17 @@
                 lengthSelect.dispatchEvent(new Event("change", { bubbles: true }));
             };
 
-            const waitForTable = new MutationObserver((_m, obs) => {
+            observeUntilReady(() => {
                 const table = document.getElementById("dataTable01");
                 const tbody = table?.querySelector("tbody");
                 const lengthSelect = document.querySelector('select[name="dataTable01_length"]');
 
                 if (table && tbody && tbody.querySelectorAll("tr").length > 0 && lengthSelect) {
-                    obs.disconnect();
                     triggerLengthChangeAndWait();
+                    return true;
                 }
+                return false;
             });
-
-            waitForTable.observe(document.body, { childList: true, subtree: true });
 
             setInterval(() => {
                 const now = Date.now();
@@ -1593,20 +1614,20 @@
                 console.log("[CG] Year/Semester filter initialized");
             }
 
-            const waitTable = new MutationObserver((_m, obs) => {
+            observeUntilReady(() => {
                 const table = document.getElementById("02");
                 const tbody = table?.querySelector("tbody tr");
                 if (table && tbody) {
-                    obs.disconnect();
+                    if (!document.getElementsByClassName("seiseki-marker-contents-body")[0]) return false;
                     initYearSemesterFilter();
                     const reportDate = document.getElementById("reportDate");
                     if (reportDate) {
                         reportDate.click();
                     }
+                    return true;
                 }
+                return false;
             });
-
-            waitTable.observe(document.body, { childList: true, subtree: true });
         } else if (document.title === "連絡一覧") {
             const cPageNation = document.getElementsByClassName("c-pagination")[0];
             if (cPageNation) {
