@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Comfortable Gakujo
 // @namespace    http://tampermonkey.net/
-// @version      1.11.1
+// @version      1.11.2
 // @description  READMEを必ず読んでからご利用ください：https://github.com/woody-1227/Comfortable-Gakujo/blob/main/README.md
 // @author       woody_1227
 // @match        https://gakujo.shizuoka.ac.jp/*
@@ -17,7 +17,7 @@
 (function () {
     'use strict';
 
-    const version = "1.11.1";
+    const version = "1.11.2";
     const updateURL = "https://github.com/woody-1227/Comfortable-Gakujo/raw/main/src/Comfortable_Gakujo.user.js";
 
     function waitForDomStability({
@@ -230,11 +230,19 @@
         if (gradeCheckRunning || getCookie("cg_grade_save_enabled") !== "1") return;
         gradeCheckRunning = true;
         try {
-            let page = await fetchPage(explicitSubmission(document, location.href, "SC_01002B00_Form", "SC_01002B00_01/studentRecordAnnouncementContentsLink"));
-            const detail = Array.from(page.doc.querySelectorAll("a, button, input[type=submit]")).find(control =>
-                (control.textContent || control.value || "").replace(/\s/g, "").includes("成績情報詳細"));
-            if (detail) page = await fetchPage(pageSubmission(page.doc, page.url, detail));
-            const hash = "detail-v1:" + await sha256(JSON.stringify(gradeSnapshot(page.doc)));
+            let gradeDoc = document;
+            if (document.title === "ホーム画面（学生・保護者）") {
+                const dashboard = await fetchPage(explicitSubmission(document, location.href, "emptyForm", "SC_15005B00_01/init"));
+                if (dashboard.doc.title !== "成績ダッシュボード") throw new Error("成績ダッシュボードを取得できませんでした。");
+                const detail = Array.from(dashboard.doc.querySelectorAll(".c-btn-submit01")).find(control =>
+                    control.textContent.trim() === "成績情報詳細");
+                const info = await fetchPage(pageSubmission(dashboard.doc, dashboard.url, detail));
+                if (!["成績情報", "成績情報詳細"].includes(info.doc.title)) throw new Error("成績情報を取得できませんでした。");
+                gradeDoc = info.doc;
+            } else if (!["成績情報", "成績情報詳細"].includes(document.title)) {
+                return;
+            }
+            const hash = "detail-v1:" + await sha256(JSON.stringify(gradeSnapshot(gradeDoc)));
             if (getCookie("cg_grade_save_enabled") !== "1") return;
             const previous = decodeURIComponent(getCookie("cg_grade") || "");
             if (previous.startsWith("detail-v1:") && previous !== hash) setCookie("cg_grade_updated", "1");
@@ -257,7 +265,7 @@
 
         const notice = document.createElement("div");
         notice.className = "cg-grade-notice-container";
-        notice.innerHTML = `<button class="cg-grade-notice-button c-main-menu-btn" onclick="showLoading();postSubmit('SC_01002B00_Form', 'SC_01002B00_01/studentRecordAnnouncementContentsLink')"><i class="c-icon-notice" aria-hidden="true" style="margin-right: 0.5em"></i>成績が更新されました</button>`;
+        notice.innerHTML = `<button class="cg-grade-notice-button c-main-menu-btn" onclick="showLoading();postSubmit('emptyForm', 'SC_15005B00_01/init')"><i class="c-icon-notice" aria-hidden="true" style="margin-right: 0.5em"></i>成績が更新されました</button>`;
 
         const style = document.createElement('style');
         style.textContent = `
@@ -472,6 +480,19 @@
                 font-variant-numeric: tabular-nums;
                 font-size: clamp(1.4rem, 1.5vw, 1.8rem);
                 overflow-wrap: anywhere;
+            }
+            @media screen and (max-width: 560px) {
+                .cg-notice-with-countdown > #cg-home-task-countdown {
+                    gap: 4px;
+                    padding: 10px 8px;
+                }
+                #cg-home-task-countdown .cg-deadline-heading {
+                    font-size: 14px;
+                }
+                #cg-home-task-countdown .cg-deadline-clock {
+                    font-size: clamp(12px, 3.4vw, 16px);
+                    line-height: 1.6;
+                }
             }
             #cg-home-task-countdown[hidden] { display: none; }
             .index-main-visual[data-cg-deadline-urgency="warning"] .index-main-visual-bg {
@@ -842,12 +863,6 @@
             });
             showUpdateNotice();
             void checkGradeUpdates();
-            setInterval(() => {
-                if (document.visibilityState === "visible") void checkGradeUpdates();
-            }, 5 * 60 * 1000);
-            document.addEventListener("visibilitychange", () => {
-                if (document.visibilityState === "visible") void checkGradeUpdates();
-            });
 
             const indexMainVisualNotice = document.getElementsByClassName("index-main-visual-notice")[0];
             if (!indexMainVisualNotice.querySelector(".index-main-visual-notice-other")) {
@@ -1620,6 +1635,7 @@
                 if (table && tbody) {
                     if (!document.getElementsByClassName("seiseki-marker-contents-body")[0]) return false;
                     initYearSemesterFilter();
+                    void checkGradeUpdates();
                     const reportDate = document.getElementById("reportDate");
                     if (reportDate) {
                         reportDate.click();

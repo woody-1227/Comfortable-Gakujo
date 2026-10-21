@@ -22,7 +22,7 @@ function setup() {
         if (page instanceof Error) throw page;
         return { doc: page, url: context.location.href };
     };
-    return { context, cookies, setPage(value) { page = value; } };
+    return { context, cookies, setPage(value) { page = value; context.document = value; } };
 }
 function gradePage(rows) {
     const table = {
@@ -31,12 +31,11 @@ function gradePage(rows) {
             getAttribute: () => label, textContent: text,
         })) })),
     };
-    return { getElementById: () => table, querySelectorAll: () => [] };
+    return { title: "成績情報", getElementById: () => table, querySelectorAll: () => [] };
 }
 const row = grade => [['科目名', '数学'], ['評価', grade], ['成績報告時期', '2026年度 前期']];
-test('first fetch and legacy migration establish a baseline; a changed individual grade notifies', async () => {
+test('first visit establishes a baseline; a changed individual grade notifies', async () => {
     const state = setup();
-    state.cookies.set('cg_grade', 'old-chart-hash');
     state.setPage(gradePage([row('良')]));
     await state.context.checkGradeUpdates();
     assert.match(state.cookies.get('cg_grade'), /^detail-v1:/);
@@ -47,7 +46,7 @@ test('first fetch and legacy migration establish a baseline; a changed individua
     await state.context.checkGradeUpdates();
     assert.equal(state.cookies.get('cg_grade_updated'), '1');
 });
-test('network errors and missing detail tables preserve the baseline', async () => {
+test('invalid pages and missing detail tables preserve the baseline', async () => {
     const state = setup();
     state.cookies.set('cg_grade', 'detail-v1:previous');
     for (const page of [new Error('offline'), { getElementById: () => null, querySelectorAll: () => [] }]) {
@@ -106,4 +105,43 @@ test('real portal submitFormButton uses the formid token fields and POST target'
     assert.equal(request.data.get('_csrf'), 'fresh-token');
     attributes.onclick = "submitFormButton($(this), 'https://example.org/forward', '', '')";
     assert.throws(() => context.pageSubmission({ getElementById: () => form }, context.location.href, control));
+});
+
+test('home checks grades through the dashboard without the removed home link', async () => {
+    const state = setup();
+    state.context.document = { title: 'ホーム画面（学生・保護者）' };
+    let requests = 0;
+    state.context.explicitSubmission = (_doc, _url, form, action) => {
+        assert.equal(form, 'emptyForm');
+        assert.equal(action, 'SC_15005B00_01/init');
+        return {};
+    };
+    const button = { textContent: '成績情報詳細' };
+    state.context.pageSubmission = (_doc, _url, control) => {
+        assert.equal(control, button);
+        return {};
+    };
+    state.context.fetchPage = async () => {
+        requests++;
+        return { doc: requests % 2 ? { title: '成績ダッシュボード', querySelectorAll: () => [button] }
+            : gradePage([row(requests === 2 ? '良' : '優')]), url: state.context.location.href };
+    };
+    await state.context.checkGradeUpdates();
+    assert.equal(requests, 2);
+    assert.equal(state.cookies.has('cg_grade_updated'), false);
+    await state.context.checkGradeUpdates();
+    assert.equal(requests, 4);
+    assert.equal(state.cookies.get('cg_grade_updated'), '1');
+});
+
+test('old format migrates once without notification; subsequent changes notify', async () => {
+    const state = setup();
+    state.cookies.set('cg_grade', 'old-chart-hash');
+    state.setPage(gradePage([row('良')]));
+    await state.context.checkGradeUpdates();
+    assert.equal(state.cookies.has('cg_grade_updated'), false);
+    assert.match(state.cookies.get('cg_grade'), /^detail-v1:/);
+    state.setPage(gradePage([row('優')]));
+    await state.context.checkGradeUpdates();
+    assert.equal(state.cookies.get('cg_grade_updated'), '1');
 });
