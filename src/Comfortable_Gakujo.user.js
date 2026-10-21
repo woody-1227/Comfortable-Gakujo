@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Comfortable Gakujo
 // @namespace    http://tampermonkey.net/
-// @version      1.11.2
+// @version      1.11.3
 // @description  READMEを必ず読んでからご利用ください：https://github.com/woody-1227/Comfortable-Gakujo/blob/main/README.md
 // @author       woody_1227
 // @match        https://gakujo.shizuoka.ac.jp/*
@@ -17,7 +17,7 @@
 (function () {
     'use strict';
 
-    const version = "1.11.2";
+    const version = "1.11.3";
     const updateURL = "https://github.com/woody-1227/Comfortable-Gakujo/raw/main/src/Comfortable_Gakujo.user.js";
 
     function waitForDomStability({
@@ -513,10 +513,9 @@
         notice.append(title, timer);
         notice.hidden = true;
 
-        let nextDeadline = Infinity;
         const updateBackground = remaining => updateDeadlineBackground(document.querySelector(".index-main-visual"), remaining);
         const renderClock = remaining => {
-            renderDeadlineCountdown(timer, remaining, 2);
+            renderDeadlineCountdown(timer, remaining);
             updateBackground(remaining);
         };
         let layoutPanel;
@@ -540,7 +539,6 @@
             const panel = document.querySelector(".index-notice-other-items");
             if (!panel) {
                 notice.hidden = true;
-                nextDeadline = Infinity;
                 updateBackground(Infinity);
                 return;
             }
@@ -552,7 +550,6 @@
             const list = document.querySelector(".submissionList");
             if (!list) {
                 notice.hidden = true;
-                nextDeadline = Infinity;
                 updateBackground(Infinity);
                 return;
             }
@@ -561,7 +558,6 @@
                 .map(item => item.querySelector(".deadline")?.textContent || "");
             const now = Date.now();
             const deadline = nearestHomeDeadline(texts, now);
-            nextDeadline = deadline;
             notice.hidden = false;
             if (Number.isFinite(deadline)) {
                 renderClock(deadline - now);
@@ -574,17 +570,8 @@
             }
         };
         update();
-        // Read task information once a second and paint hundredths with the browser's frames.
+        // Refresh task information and the countdown once a second.
         setInterval(update, 1000);
-        const frame = () => {
-            if (!notice.hidden && Number.isFinite(nextDeadline)) {
-                const remaining = nextDeadline - Date.now();
-                if (remaining <= 0) update();
-                else renderClock(remaining);
-            }
-            requestAnimationFrame(frame);
-        };
-        requestAnimationFrame(frame);
     }
 
     function formatClassPeriod(period) {
