@@ -20,6 +20,10 @@
     const version = "1.12.0";
     const updateURL = "https://github.com/woody-1227/Comfortable-Gakujo/raw/main/src/Comfortable_Gakujo.user.js";
 
+    /**
+     * @param {{timeout?: number; stableTime?: number}} param0
+     * @returns {Promise<void>}
+     */
     function waitForDomStability({
         timeout = 10000,
         stableTime = 500
@@ -57,6 +61,11 @@
         });
     }
 
+    /**
+     * @param {string} selector
+     * @param {number} timeout
+     * @returns {Promise<Element>}
+     */
     function waitForSelector(selector, timeout = 10000) {
         return new Promise((resolve, reject) => {
             const start = Date.now();
@@ -74,7 +83,10 @@
         });
     }
 
-    // Check existing content as well as future mutations.
+    /**
+     * Check existing content as well as future mutations.
+     * @param {() => boolean} check
+     */
     function observeUntilReady(check) {
         const observer = new MutationObserver(() => {
             if (check()) observer.disconnect();
@@ -83,7 +95,35 @@
         if (check()) observer.disconnect();
     }
 
+    function prepareColorCss() {
+        /**
+         * @type {[string, string][]}
+         */
+        const data = [
+            ["c-gnav", "--cg-color-button"],
+            ["c-gnav-children", "--cg-color-button-selected"],
+            ["c-fixed-heading-container", "--cg-color-header"],
+            ["c-btn-prev", "--cg-color-button-back"],
+            ["c-wrapper", "--cg-color-background"],
+
+        ]
+        for (const [from, to] of data) {
+            const element = document.createElement("div");
+            element.className = from;
+            document.body.appendChild(element);
+            const color = getComputedStyle(element).backgroundColor;
+            element.remove();
+            document.documentElement.style.setProperty(
+                to,
+                color
+            );
+        }
+    }
+
     let initializationStarted = false;
+    /**
+     * @returns {Promise<void>}
+     */
     async function initializeComfortableGakujo() {
         if (initializationStarted) return;
         initializationStarted = true;
@@ -94,6 +134,10 @@
             await waitForDomStability();
 
             console.log("[CG] DOM stabilized");
+
+            prepareColorCss();
+
+            console.log("[CG] color css prepared");
 
             if (document.title === "ホーム画面（学生・保護者）") {
                 await waitForSelector(".index-container");
@@ -118,6 +162,10 @@
         window.addEventListener("load", initializeComfortableGakujo, { once: true });
     }
 
+    /**
+     * @param {string} name
+     * @returns {string|undefined}
+     */
     const getCookie = (name) => {
         return document.cookie
             .split("; ")
@@ -125,6 +173,9 @@
             ?.split("=")[1];
     };
 
+    /**
+     * @param {string} name
+     */
     const deleteCookie = (name) => {
         document.cookie = `${name}=; max-age=0; path=/`;
     };
@@ -149,7 +200,18 @@
         }
     }
 
-    // Resolve only known form submissions; never execute scripts from fetched HTML.
+    /**
+     * Resolve only known form submissions; never execute scripts from fetched HTML.
+     * @param {Document} doc
+     * @param {string} baseURL
+     * @param {HTMLDivElement} control
+     * @returns {{
+     *   url: URL;
+     *   data: FormData;
+     *   method: string;
+     * }}
+     * @throws
+     */
     function pageSubmission(doc, baseURL, control) {
         const source = `${control?.getAttribute("onclick") || ""} ${control?.getAttribute("href") || ""}`;
         const match = source.match(/postSubmit\(\s*['"]([^'"]+)['"]\s*,\s*['"]([^'"]+)['"]/);
@@ -171,12 +233,37 @@
         return { url, data, method: match || buttonMatch ? "POST" : (form.getAttribute("method") || "GET").toUpperCase() };
     }
 
+    /**
+     * @param {Document} doc
+     * @param {string} baseURL
+     * @param {string} formId
+     * @param {string} action
+     * @returns {{
+     *   url: URL;
+     *   data: FormData;
+     *   method: string;
+     * }}
+     * @throws
+     */
     function explicitSubmission(doc, baseURL, formId, action) {
         const form = doc.getElementById(formId);
         if (!form) throw new Error("学情のフォームが見つかりません。");
         return { url: new URL(action, baseURL), data: new FormData(form), method: "POST" };
     }
 
+    /**
+     * 
+     * @param {{
+     *   url: URL;
+     *   data: FormData;
+     *   method: string;
+     * }} request
+     * @returns {Promise<{
+     *   doc: Document;
+     *   url: string;
+     * }>}
+     * @throws
+     */
     async function fetchPage(request) {
         const url = new URL(request.url);
         const options = { method: request.method, credentials: "same-origin", cache: "no-store" };
@@ -194,6 +281,9 @@
         return { doc, url: new URL(doc.querySelector("base[href]")?.getAttribute("href") || response.url, response.url).href };
     }
 
+    /**
+     * @param {HTMLButtonElement} button
+     */
     async function openCreditInfo(button) {
         if (button.dataset.cgBusy) return;
         button.dataset.cgBusy = "1";
@@ -209,6 +299,12 @@
         }
     }
 
+    /**
+     * @returns {Promise<{
+     *   doc: Document;
+     *   url: string;
+     * }>}
+     */
     async function fetchGradeInfo() {
         const dashboard = await fetchPage(explicitSubmission(document, location.href, "emptyForm", "SC_15005B00_01/init"));
         if (dashboard.doc.title !== "成績ダッシュボード") throw new Error("成績ダッシュボードを取得できませんでした。");
@@ -220,6 +316,13 @@
         return info;
     }
 
+    /**
+     * @param {{
+     *   url: URL;
+     *   data: FormData;
+     *   method: string;
+     * }} request 
+     */
     function submitPage(request) {
         // Only the destination is displayed, using fresh fields from the fetched page.
         const form = document.createElement("form");
@@ -239,6 +342,10 @@
         form.remove();
     }
 
+    /**
+     * @param {HTMLButtonElement} button
+     * @returns {Promise<void>}
+     */
     async function openGradeInfo(button) {
         if (button.dataset.cgBusy) return;
         button.dataset.cgBusy = "1";
@@ -260,6 +367,10 @@
         }
     }
 
+    /**
+     * @param {Document} doc
+     * @returns {string[]}
+     */
     function gradeSnapshot(doc) {
         const table = doc.getElementById("02");
         if (!table || !table.querySelector('td[data-label="成績報告時期"]')) {
@@ -275,6 +386,9 @@
     }
 
     let gradeCheckRunning = false;
+    /**
+     * @returns {Promise<void>}
+     */
     async function checkGradeUpdates() {
         if (gradeCheckRunning || localStorage.getItem("cg_grade_save_enabled") !== "1") return;
         gradeCheckRunning = true;
@@ -301,6 +415,9 @@
         }
     }
 
+    /**
+     * @returns {boolean}
+     */
     function showUpdateNotice() {
         if (localStorage.getItem("cg_grade_updated") !== "1") return (false);
         if (document.title !== "ホーム画面（学生・保護者）") return (false);
@@ -389,12 +506,21 @@
         return (true);
     }
 
+    /**
+     * @param {string} text
+     * @returns {Promise<string>}
+     */
     async function sha256(text) {
         const uint8 = new TextEncoder().encode(text)
         const digest = await crypto.subtle.digest('SHA-256', uint8)
         return Array.from(new Uint8Array(digest)).map(v => v.toString(16).padStart(2, '0')).join('')
     }
 
+    /**
+     * @param {number} ms
+     * @param {number} precision
+     * @returns {string}
+     */
     function formatTimeLeft(ms, precision = 0) {
         const d = Math.floor(ms / (1000 * 60 * 60 * 24));
         const h = Math.floor(ms / (1000 * 60 * 60)) % 24;
@@ -407,6 +533,11 @@
         return `残り ${dayStr}${h.toString().padStart(2, '0')}時間 ${m.toString().padStart(2, '0')}分 ${seconds}秒`;
     }
 
+    /**
+     * @param {HTMLDivElement} timer
+     * @param {number} remaining
+     * @param {number} precision
+     */
     function renderDeadlineCountdown(timer, remaining, precision = 0) {
         const expired = remaining <= 0;
         timer.textContent = expired ? "締切済み" : formatTimeLeft(remaining, precision);
@@ -417,6 +548,10 @@
         });
     }
 
+    /**
+     * @param {string} text
+     * @returns {number}
+     */
     function homeTaskDeadline(text) {
         const normalized = text.normalize("NFKC");
         const dates = Array.from(normalized.matchAll(/(\d{4})[年/.-](\d{1,2})[月/.-](\d{1,2})日?(?:\s*[（(][^）)]*[）)])?\s*(\d{1,2}):(\d{2})(?::(\d{2}))?/g));
@@ -431,11 +566,20 @@
         return local.getUTCMonth() === +month - 1 && local.getUTCDate() === +day ? value : NaN;
     }
 
+    /**
+     * @param {string[]} texts
+     * @param {number} now
+     * @returns {number}
+     */
     function nearestHomeDeadline(texts, now) {
         return texts.map(homeTaskDeadline).filter(deadline => Number.isFinite(deadline) && deadline > now)
             .reduce((nearest, deadline) => Math.min(nearest, deadline), Infinity);
     }
 
+    /**
+     * @param {HTMLDialogElement} visual
+     * @param {number} remaining
+     */
     function updateDeadlineBackground(visual, remaining) {
         if (!visual) return;
         const urgency = remaining > 0 && remaining < 86400000 ? "critical"
@@ -510,53 +654,45 @@
             #cg-background-dialog { position:fixed !important; inset:0 !important; margin:auto !important;
                 width:min(640px, calc(100vw - 40px)); height:fit-content; max-width:calc(100vw - 40px);
                 max-height:calc(100vh - 48px); max-height:calc(100dvh - 48px);
-                padding:0; box-sizing:border-box; border:1px solid #cfe3e1; border-radius:0;
-                background:#f5fafa; color:#244344; text-align:left;
+                padding:0; box-sizing:border-box; border:0px; border-radius:0;
+                background:white; color:#333333; text-align:left;
                 box-shadow:0 20px 64px rgba(0,65,68,.24); font:14px/1.6 sans-serif; overflow:hidden; }
             #cg-background-dialog[open] { display:grid; grid-template-rows:auto minmax(0,1fr) auto; }
             #cg-background-dialog:not([open]) { display:none; }
             #cg-background-dialog::backdrop { background:rgba(14,45,47,.42); backdrop-filter:blur(3px); }
-            #cg-background-dialog .cg-bg-header { position:relative; padding:22px 26px 18px; background:linear-gradient(120deg,#e7f5f3,#fff); border-top:4px solid #00858a; border-bottom:1px solid #dbe9e8; }
+            #cg-background-dialog .cg-bg-header { position:relative; padding:22px 26px 18px; background: var(--cg-color-header); border: 1px solid #ffffff; }
             #cg-background-dialog #cg-background-close { position:absolute; top:12px; right:12px;
                 display:flex; align-items:center; justify-content:center; width:36px; height:36px;
                 padding:0; border:0; border-radius:0; background:transparent; color:#365253;
                 font:28px/1 sans-serif; cursor:pointer; }
-            #cg-background-dialog #cg-background-close:hover { background:#e7f4f3; }
             #cg-background-dialog .cg-bg-header { padding-right:60px; }
-            #cg-background-dialog h2 { margin:0; font-size:22px; font-weight:700; color:#006e73; }
+            #cg-background-dialog h2 { margin:0; font-size:22px; font-weight:700; color: #333333; }
             #cg-background-dialog p { margin:8px 0 0; }
             #cg-background-dialog .cg-bg-body { padding:20px 26px; min-height:0; overflow-y:auto; overscroll-behavior:contain; }
             #cg-background-dialog .cg-bg-fields { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
             #cg-background-dialog label { display:block; margin:0 0 18px; font-weight:600; }
+            #cg-background-dialog select {
+                border-radius:0;
+            }
             #cg-background-dialog select, #cg-background-file { display:block; width:100%; box-sizing:border-box;
-                margin-top:8px; padding:11px 12px; border:1px solid #bcd2d1; border-radius:0; background:#fff;
-                color:#244344; font:inherit; }
-            #cg-background-file { font-weight:400; }
+                background:#fff; color:#244344; font:inherit; }
+            #cg-background-file { padding:11px 12px; border-radius: 2px; font-weight:400; border: 1px solid #ccc; }
             #cg-background-file::file-selector-button { border:0; border-radius:0; padding:7px 10px;
-                margin-right:10px; background:#e7f4f3; color:#007b80; font:600 13px sans-serif; cursor:pointer; }
-            #cg-background-dialog .cg-bg-caption { color:#5e7778; font-size:12px; }
+                margin-right:10px; background:var(--cg-color-button); color:white; font:600 13px sans-serif; cursor:pointer; }
+            #cg-background-dialog .cg-bg-caption { color: #333333; font-size:12px; }
             #cg-background-preview { width:100%; background-position:center; background-size:cover;
                 border:1px solid #d3e4e3; box-sizing:border-box; border-radius:0; margin:10px 0 16px;
                 box-shadow:0 3px 12px rgba(15,23,42,.08); }
             #cg-background-dialog .cg-bg-footer { display:flex; align-items:center; flex-wrap:wrap; gap:10px;
                 padding:16px 26px; border-top:1px solid #dbe9e8; background:#fff; }
-            #cg-background-dialog button { padding:10px 16px; border:1px solid #bcd2d1; border-radius:0;
-                background:#fff; color:#365253; font:600 14px/1.4 sans-serif; cursor:pointer; }
-            #cg-background-dialog button:hover { background:#edf6f5; }
-            #cg-background-dialog #cg-background-save { background:#00858a; color:#fff; border-color:#00858a; }
-            #cg-background-dialog #cg-background-save:hover { background:#006e73; }
-            #cg-background-dialog #cg-background-reset { margin-right:auto; color:#b33b41; border-color:transparent; }
+            #cg-background-dialog #cg-background-reset { margin-right:auto; color:white; border-color:transparent; }
             #cg-background-dialog button:disabled { opacity:.5; cursor:wait; }
-            #cg-background-dialog :focus-visible, #cg-header-uploader:focus-visible { outline:3px solid #69bfc2; outline-offset:3px; }
             #cg-background-preview-bar { position:fixed; bottom:20px; left:50%; transform:translateX(-50%);
                 z-index:10000; display:flex; align-items:center; gap:16px; width:max-content; max-width:calc(100vw - 32px);
-                box-sizing:border-box; padding:12px 18px; border:1px solid #d3e4e3; border-radius:0;
+                box-sizing:border-box; padding:12px 18px; border-radius:0;
                 background:rgba(255,255,255,.97); color:#244344; box-shadow:0 8px 30px rgba(15,23,42,.25);
                 font:600 14px/1.5 sans-serif; flex-wrap:wrap; }
             #cg-background-preview-bar[hidden] { display:none; }
-            #cg-background-preview-bar button { border:0; border-radius:0; padding:10px 14px;
-                background:#00858a; color:white; font:inherit; cursor:pointer; }
-            #cg-background-error { color:#b33b41; min-height:1.6em; }
             @media screen and (max-width:560px) {
                 #cg-background-dialog { width:calc(100vw - 24px); max-width:calc(100vw - 24px);
                     max-height:calc(100dvh - 24px); border-radius:0; }
@@ -567,6 +703,12 @@
                 #cg-background-dialog .cg-bg-fields { grid-template-columns:1fr; gap:0; }
                 #cg-background-dialog .cg-bg-footer { padding:14px 18px; }
                 #cg-background-dialog #cg-background-reset { width:100%; text-align:left; }
+            }
+            .width-100 {
+                width: 100% !important;
+            }
+            .cg-bg-fields .c-form-box {
+                margin-top: 8px;
             }
         `;
         document.head.appendChild(style);
@@ -595,16 +737,19 @@
         const dialog = document.createElement("dialog");
         dialog.id = "cg-background-dialog";
         dialog.setAttribute("aria-labelledby", "cg-background-title");
-        dialog.innerHTML = `<header class="cg-bg-header"><button type="button" id="cg-background-close" aria-label="設定を閉じる" title="閉じる">×</button><h2 id="cg-background-title">背景をカスタマイズ</h2><p class="cg-bg-caption">締め切りの状況に合わせて、トップページの雰囲気を変えられます。</p></header>
+        dialog.innerHTML = `<header class="cg-bg-header"><button type="button" id="cg-background-close" aria-label="設定を閉じる" title="閉じる">×</button><h2 id="cg-background-title">背景をカスタマイズ</h2></header>
             <div class="cg-bg-body"><div class="cg-bg-fields">
-            <label>表示範囲 <select id="cg-background-mode"><option value="header">横長（ヘッダー）</option><option value="full">画面全体</option></select></label>
-            <label>設定する状態 <select id="cg-background-state"><option value="normal">通常（3日以上）</option><option value="warning">締切まで1日以上・3日未満</option><option value="critical">締切まで1日未満</option><option value="none">課題なし（締切前の課題なし）</option></select></label>
+            <label>表示範囲 <div class="c-form-box"><div class="select_wrapper u-w100per-sp width-100"><select id="cg-background-mode" class="select u-w260-pc u-w100per-sp js-select"><option value="header">横長（ヘッダー）</option><option value="full">画面全体</option></select></div></div></label>
+            <label>設定する状態 <div class="c-form-box"><div class="select_wrapper u-w100per-sp width-100"><select id="cg-background-state" class="select u-w260-pc u-w100per-sp js-select"><option value="normal">通常（3日以上）</option><option value="warning">締切まで1日以上・3日未満</option><option value="critical">締切まで1日未満</option><option value="none">課題なし（締切前の課題なし）</option></select></div></div></label>
             </div><label>背景画像 <input id="cg-background-file" type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/avif"></label>
-            <p class="cg-bg-caption">プレビュー · 中央を基準に表示範囲に合わせます</p><div id="cg-background-preview" role="img" aria-label="背景画像のプレビュー"></div>
-            <p class="cg-bg-caption">画像未設定の場合、通常は標準画像、締切まで3日未満の場合は警告柄、課題なしは通常の画像を使用します。</p>
+            <p class="cg-bg-caption">プレビュー · 中央に合わせて表示されます。</p><div id="cg-background-preview" role="img" aria-label="背景画像のプレビュー"></div>
+            <p class="cg-bg-caption">画像未設定の場合、締切が近づくと警告柄となります。</p>
             <p id="cg-background-error" role="status"></p>
-            </div><footer class="cg-bg-footer"><button type="button" id="cg-background-reset">この状態の画像を解除</button>
-            <button type="button" id="cg-background-page-preview">ページでプレビュー</button><button type="button" id="cg-background-cancel">キャンセル</button><button type="button" id="cg-background-save">変更を保存</button></footer>`;
+            </div><footer class="cg-bg-footer">
+            <button type="button" id="cg-background-reset" class="c-btn c-btn-submit02"><span class="c-btn-link"><span class="c-btn-text ">背景をリセット</span></span></button>
+            <button type="button" id="cg-background-page-preview" class="c-btn c-btn-submit01"><span class="c-btn-link"><span class="c-btn-text ">ページでプレビュー</span><i class="c-icon-arrow-right c-color-base" aria-hidden="true"></i></span></button>
+            <button type="button" id="cg-background-save" class="c-btn c-btn-submit01 active"><span class="c-btn-link"><span class="c-btn-text ">変更を保存</span></span></button>
+            </footer>`;
         document.body.appendChild(dialog);
         const mode = dialog.querySelector("#cg-background-mode");
         const state = dialog.querySelector("#cg-background-state");
@@ -615,7 +760,7 @@
         const previewBar = document.createElement("div");
         previewBar.id = "cg-background-preview-bar";
         previewBar.hidden = true;
-        previewBar.innerHTML = `<span role="status">背景をプレビュー中（未保存）</span><button type="button">設定に戻る</button>`;
+        previewBar.innerHTML = `<span role="status">背景をプレビュー中（未保存）</span><button type="button" class="c-btn c-btn-submit01"><span class="c-btn-link"><span class="c-btn-text ">設定に戻る</span><i class="c-icon-arrow-right c-color-base" aria-hidden="true"></i></span></button>`;
         document.body.appendChild(previewBar);
         const returnToSettings = () => {
             pagePreview = null;
@@ -699,7 +844,6 @@
             apply();
             dialog.close();
         });
-        dialog.querySelector("#cg-background-cancel").addEventListener("click", () => dialog.close());
         dialog.querySelector("#cg-background-close").addEventListener("click", () => dialog.close());
     }
 
@@ -881,6 +1025,10 @@
         setInterval(update, 1000);
     }
 
+    /**
+     * @param {string} period
+     * @returns {string}
+     */
     function formatClassPeriod(period) {
         const normalized = period.normalize("NFKC");
         const numbers = normalized.match(/\d+/g)?.map(Number);
@@ -892,6 +1040,19 @@
         return `${classes.join("・")}コマ`;
     }
 
+    /**
+     * @param {Document} doc
+     * @returns {{
+     *   year: string | undefined;
+     *   semester: string | undefined;
+     *   order: Map<string, number>;
+     *   slots: Map<string, {
+     *     order: number;
+     *     day: number;
+     *     period: string;
+     *   }[]>;
+     * }}
+     */
     function collectTimetableOrder(doc) {
         const order = new Map();
         const slots = new Map();
@@ -921,6 +1082,22 @@
         };
     }
 
+    /**
+     * @param {HTMLDialogElement} select
+     * @param {{
+     *   year: string | undefined;
+     *   semester: string | undefined;
+     *   order: Map<string, number>;
+     *   slots: Map<string, {
+     *     order: number;
+     *     day: number;
+     *     period: string;
+     *   }[]>;
+     * }} timetable
+     * @param {string} year
+     * @param {string} semester
+     * @returns {boolean}
+     */
     function sortReferenceOptions(select, timetable, year, semester) {
         if (!select) return false;
         const valid = year === timetable.year && semester === timetable.semester && timetable.order.size > 0;
@@ -1001,9 +1178,31 @@
     }
 
     const hiddenTasksStorageKey = "cg-hidden-tasks";
+    /**
+     * @param {{
+     *   submissionType: string;
+     *   subject: string;
+     *   title: string;
+     * }} a
+     * @param {{
+     *   submissionType: string;
+     *   subject: string;
+     *   title: string;
+     * }} b
+     * @returns {boolean}
+     */
     const sameHiddenTask = (a, b) => a.submissionType === b.submissionType &&
         a.subject === b.subject && a.title === b.title;
 
+    /**
+     * @returns {{
+     *   submissionType: string;
+     *   subject: string;
+     *   title: string;
+     *   submittalTerm: string;
+     *   submittalStatus: string;
+     * }}
+     */
     function getHiddenTasks() {
         const tasks = JSON.parse(localStorage.getItem(hiddenTasksStorageKey) || "[]");
         if (!Array.isArray(tasks)) throw new Error("非表示課題の保存データを読み込めませんでした。");
@@ -1034,6 +1233,13 @@
         return tasks;
     }
 
+    /**
+     * @param {string} submissionType
+     * @param {string} subject
+     * @param {string} title
+     * @param {string} submittalTerm
+     * @param {string} submittalStatus
+     */
     function addHiddenTask(submissionType, subject, title, submittalTerm, submittalStatus) {
         const tasks = getHiddenTasks();
         const task = { submissionType, subject, title, submittalTerm, submittalStatus };
@@ -1042,12 +1248,20 @@
         localStorage.setItem(hiddenTasksStorageKey, JSON.stringify(tasks));
     }
 
+    /**
+     * @param {string} submissionType
+     * @param {string} subject
+     * @param {string} title
+     */
     function removeHiddenTask(submissionType, subject, title) {
         const task = { submissionType, subject, title };
         const tasks = getHiddenTasks().filter(saved => !sameHiddenTask(saved, task));
         localStorage.setItem(hiddenTasksStorageKey, JSON.stringify(tasks));
     }
 
+    /**
+     * @returns {void}
+     */
     function startComfortableGakujo() {
         console.log("[CG] startComfortableGakujo (page fully loaded)");
         if (["ホーム画面（学生・保護者）", "成績情報", "成績情報詳細"].includes(document.title)) {
