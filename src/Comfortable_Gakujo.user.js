@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Comfortable Gakujo
 // @namespace    http://tampermonkey.net/
-// @version      1.12.0
+// @version      1.13.0
 // @description  READMEを必ず読んでからご利用ください：https://github.com/woody-1227/Comfortable-Gakujo/blob/main/README.md
 // @author       woody_1227
 // @match        https://gakujo.shizuoka.ac.jp/*
@@ -17,7 +17,7 @@
 (function () {
     'use strict';
 
-    const version = "1.12.0";
+    const version = "1.13.0";
     const updateURL = "https://github.com/woody-1227/Comfortable-Gakujo/raw/main/src/Comfortable_Gakujo.user.js";
 
     function waitForDomStability({
@@ -854,16 +854,14 @@
             }
             if (notice.parentElement !== panel || panel.lastElementChild !== notice) panel.appendChild(notice);
             const list = document.querySelector(".submissionList");
-            if (!list) {
-                notice.hidden = true;
-                updateBackground(Infinity);
-                return;
-            }
-            const texts = Array.from(list.querySelectorAll(".submissionList_item"))
+            const texts = Array.from(list?.querySelectorAll(".submissionList_item") || [])
                 .filter(item => item.classList.contains("is-yet") || item.querySelector(".c-status-yet"))
                 .map(item => item.querySelector(".deadline")?.textContent || "");
             const now = Date.now();
-            const deadline = nearestHomeDeadline(texts, now);
+            let deadline = nearestHomeDeadline(texts, now);
+            try {
+                for (const task of pendingOriginalTasks(readOriginalTasks(now), now)) deadline = Math.min(deadline, task.end);
+            } catch (error) { console.warn("[CG] オリジナルタスクの締切確認失敗", error); }
             panel.closest(".index-main-visual")?.setAttribute("data-cg-no-tasks", String(!Number.isFinite(deadline)));
             notice.hidden = false;
             if (Number.isFinite(deadline)) {
@@ -1000,6 +998,304 @@
         })();
     }
 
+    const originalTasksStorageKey = "cg-original-tasks";
+
+    function readOriginalTasks(now = Date.now()) {
+        const raw = localStorage.getItem(originalTasksStorageKey);
+        const tasks = JSON.parse(raw || "[]");
+        if (!Array.isArray(tasks)) throw new Error("オリジナルタスクの保存データを読み込めませんでした。");
+        const active = tasks.filter(task => task && Number.isFinite(task.end) && task.end > now);
+        if (active.length !== tasks.length) {
+            if (active.length) localStorage.setItem(originalTasksStorageKey, JSON.stringify(active));
+            else localStorage.removeItem(originalTasksStorageKey);
+        }
+        return active;
+    }
+
+    function saveOriginalTasks(tasks) {
+        if (tasks.length) localStorage.setItem(originalTasksStorageKey, JSON.stringify(tasks));
+        else localStorage.removeItem(originalTasksStorageKey);
+        window.dispatchEvent(new Event("cg-original-tasks-changed"));
+    }
+
+    const isOriginalTaskOpen = (task, now = Date.now()) => task.start <= now && now < task.end;
+    const pendingOriginalTasks = (tasks, now = Date.now()) => tasks.filter(task => !task.submitted && isOriginalTaskOpen(task, now));
+
+    // datetime-local inputs and displayed submission periods always use Japan time.
+    function originalTaskDate(value) {
+        return new Date(value + 9 * 3600000).toISOString().slice(0, 16);
+    }
+
+    function originalTaskLink(value) {
+        if (!value.trim()) return "";
+        const url = new URL(value.trim(), location.href);
+        if (!["https:", "http:"].includes(url.protocol)) throw new Error("リンクは http または https のURLを指定してください。");
+        return url.href;
+    }
+
+    function installOriginalTaskCleanup() {
+        const cleanup = () => {
+            try { readOriginalTasks(); }
+            catch (error) { console.warn("[CG] オリジナルタスクの期限確認失敗", error); }
+        };
+        cleanup();
+        setInterval(cleanup, 1000);
+        document.addEventListener("visibilitychange", () => { if (!document.hidden) cleanup(); });
+    }
+
+    function installHomeTaskCount() {
+        const baseCounts = new WeakMap();
+        const update = () => {
+            try {
+                const now = Date.now();
+                const extra = pendingOriginalTasks(readOriginalTasks(now), now).length;
+                let count = document.querySelector(".index-main-visual .count");
+                if (!count && extra) {
+                    const panel = document.querySelector(".index-notice-other-items");
+                    if (!panel) return;
+                    const item = document.createElement("li");
+                    item.className = "index-notice-other-item";
+                    item.innerHTML = `<div class="index-main-visual-notice-box cg-index-notice-other-link"><p class="title">未提出課題</p><div class="content"><p class="count"><span class="num">0</span>件</p></div></div>`;
+                    panel.prepend(item);
+                    count = item.querySelector(".count");
+                }
+                if (!count) return;
+                if (!baseCounts.has(count)) baseCounts.set(count, Number(count.textContent.match(/(\d+)件/)?.[1] || 0));
+                const original = baseCounts.get(count);
+                const hidden = Math.min(original, getHiddenTasks().filter(task => {
+                    const deadline = homeTaskDeadline(task.submittalTerm);
+                    return deadline > now && task.submittalStatus === "未提出";
+                }).length);
+                const html = `<span class="num" style="color: red;">${original - hidden + extra}</span>件` +
+                    (hidden ? ` + <span style="color: gray;">${hidden}件</span>` : "");
+                if (count.innerHTML !== html) count.innerHTML = html;
+            } catch (error) { console.warn("[CG] 未提出タスク件数の表示失敗", error); }
+        };
+        update();
+        setInterval(update, 1000);
+        window.addEventListener("cg-original-tasks-changed", update);
+        window.addEventListener("storage", update);
+    }
+
+    function installOriginalTasksTable() {
+        const style = document.createElement("style");
+        style.textContent = `
+            .cg-task-toolbar { margin: 12px 0; }
+            .cg-task-actions { display: flex; flex-wrap: wrap; gap: 5px; justify-content: center; }
+            .cg-task-actions button { display: inline-flex; align-items: center; justify-content: center; gap: 4px;
+                min-width: 24px; height: 24px; padding: 0 6px; font-size: 12px; white-space: nowrap;
+                line-height: 24px; text-align: center; cursor: pointer; border: none; background: #eee;
+                border-radius: 4px; transition: background 0.2s; }
+            .cg-task-actions button:hover { background: #ccc; }
+            .cg-task-actions svg { width: 16px; height: 16px; flex-shrink: 0; }
+            #cg-task-editor { position: fixed !important; inset: 0 !important; margin: auto !important;
+                width: min(560px, calc(100vw - 32px)); height: fit-content; box-sizing: border-box;
+                max-height: calc(100vh - 32px); max-height: calc(100dvh - 32px); overflow: auto;
+                padding: 24px; border: 2px solid #148980; border-radius: 8px; color: #333; background: white; }
+            #cg-task-editor::backdrop { background: #0007; }
+            #cg-task-editor form { display: grid; gap: 12px; }
+            #cg-task-editor h2 { font-size: 20px; margin: 0; }
+            #cg-task-editor label { display: grid; gap: 4px; }
+            #cg-task-editor input, #cg-task-editor select { width: 100%; box-sizing: border-box; padding: 8px; }
+            #cg-task-editor .cg-task-buttons { display: flex; gap: 12px; justify-content: flex-end; }
+            #cg-task-editor button { padding: 8px 16px; cursor: pointer; }
+            #cg-task-editor .cg-task-error { color: #b00020; white-space: pre-wrap; }
+            #dataTable01 tr[data-cg-original-task] a { text-decoration: underline; }
+        `;
+        document.head.appendChild(style);
+        const dialog = document.createElement("dialog");
+        dialog.id = "cg-task-editor";
+        dialog.innerHTML = `<form>
+            <h2>オリジナルタスク</h2>
+            <p>提出物種別：タスク ／ 状態：提出期間内は受付中、開始前は受付前</p>
+            <label>タイトル（必須）<input name="title" required maxlength="300"></label>
+            <label>講義名<input name="subject" maxlength="200"></label>
+            <label>提出開始（日本時間・必須）<input name="start" type="datetime-local" required></label>
+            <label>提出期限（日本時間・必須）<input name="end" type="datetime-local" required></label>
+            <label>提出状況<select name="submitted"><option value="0">未提出</option><option value="1">提出済み</option></select></label>
+            <label>レポート提出画面のリンク（任意）<input name="url" type="text" placeholder="https://..."></label>
+            <p>提出期限になると、提出済みのタスクもこのブラウザの保存データから削除します。</p>
+            <p class="cg-task-error" role="alert"></p>
+            <div class="cg-task-buttons"><button type="button" data-cg-cancel>キャンセル</button><button type="submit">保存</button></div>
+        </form>`;
+        document.body.appendChild(dialog);
+        const form = dialog.querySelector("form");
+        const field = name => form.elements.namedItem(name);
+        const errorElement = dialog.querySelector(".cg-task-error");
+        let editingId = null;
+        const edit = task => {
+            editingId = task?.id || null;
+            form.reset();
+            errorElement.textContent = "";
+            for (const name of ["title", "subject", "url"]) field(name).value = task?.[name] || "";
+            const now = Date.now();
+            field("start").value = originalTaskDate(task?.start ?? now);
+            field("end").value = task ? originalTaskDate(task.end) : "";
+            field("submitted").value = task?.submitted ? "1" : "0";
+            dialog.showModal();
+        };
+        dialog.querySelector("[data-cg-cancel]").addEventListener("click", () => dialog.close());
+        form.addEventListener("submit", event => {
+            event.preventDefault();
+            try {
+                const start = homeTaskDeadline(field("start").value.replace("T", " "));
+                const end = homeTaskDeadline(field("end").value.replace("T", " "));
+                if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) throw new Error("提出期限は提出開始より後にしてください。");
+                if (end <= Date.now()) throw new Error("提出期限は現在より後にしてください。");
+                const title = field("title").value.trim();
+                if (!title) throw new Error("タイトルを入力してください。");
+                const tasks = readOriginalTasks();
+                if (editingId && !tasks.some(task => task.id === editingId)) throw new Error("このタスクは期限切れまたは別のタブで削除されました。閉じて一覧を確認してください。");
+                const task = { id: editingId || crypto.randomUUID(), title,
+                    subject: field("subject").value.trim(),
+                    start, end, submitted: field("submitted").value === "1", url: originalTaskLink(field("url").value) };
+                saveOriginalTasks([...tasks.filter(saved => saved.id !== task.id), task]);
+                dialog.close();
+            } catch (error) { errorElement.textContent = `保存できませんでした：${error.message}`; }
+        });
+        const actionButton = (label, handler) => {
+            const button = document.createElement("button");
+            button.type = "button";
+            button.textContent = label;
+            button.addEventListener("click", event => { event.stopPropagation(); handler(); });
+            return button;
+        };
+        const changeTask = (id, remove) => {
+            try {
+                const tasks = readOriginalTasks();
+                const task = tasks.find(saved => saved.id === id);
+                if (!task) return;
+                if (remove) {
+                    if (!window.confirm(`「${task.title}」を削除しますか？`)) return;
+                    saveOriginalTasks(tasks.filter(saved => saved.id !== id));
+                } else {
+                    task.submitted = !task.submitted;
+                    saveOriginalTasks(tasks);
+                }
+            } catch (error) { window.alert(`タスクを更新できませんでした：${error.message}`); }
+        };
+        let previousSignature = "";
+        let previousTable;
+        let sampleLabels = [];
+        const refresh = () => {
+            const table = document.getElementById("dataTable01");
+            const tbody = table?.querySelector("tbody");
+            if (!tbody) return;
+            if (!document.getElementById("cg-task-toolbar")) {
+                const toolbar = document.createElement("div");
+                toolbar.id = "cg-task-toolbar";
+                toolbar.className = "cg-task-toolbar c-filter_box c-form-box";
+                const addButton = actionButton("＋ タスクを追加", () => edit(null));
+                addButton.className = "c-btn c-btn-submit01";
+                addButton.innerHTML = '<span class="c-btn-link"><span class="c-btn-text">＋ タスクを追加</span></span>';
+                toolbar.appendChild(addButton);
+                table.before(toolbar);
+            }
+            try {
+                const now = Date.now();
+                const tasks = readOriginalTasks(now);
+                const signature = JSON.stringify([tasks.map(task => [task, isOriginalTaskOpen(task, now)]), table.querySelector("thead")?.textContent]);
+                if (table === previousTable && signature === previousSignature && tbody.querySelectorAll("tr[data-cg-original-task]").length === tasks.length) return;
+                previousSignature = signature;
+                previousTable = table;
+                const sample = tbody.querySelector("tr:not([data-cg-original-task]) td[data-label]")?.parentElement;
+                if (sample) sampleLabels = Array.from(sample.cells).filter(cell => cell.hasAttribute("data-label")).map(cell => cell.getAttribute("data-label"));
+                const headers = Array.from(table.querySelectorAll("thead tr:first-child th"));
+                let columnIndex = 0;
+                const labels = headers.map(header => header.classList.contains("hidebutton-header") ? "操作" : sampleLabels[columnIndex++] || header.textContent.replace(/\s+/g, "").trim());
+                tbody.querySelectorAll("tr[data-cg-original-task]").forEach(row => row.remove());
+                tbody.querySelectorAll(".dataTables_empty").forEach(cell => { cell.parentElement.hidden = tasks.length > 0; });
+                for (const task of tasks) {
+                    const row = document.createElement("tr");
+                    row.dataset.cgOriginalTask = task.id;
+                    row.style.backgroundColor = task.submitted ? "#e5ffe5" : "";
+                    let url = "";
+                    try { url = originalTaskLink(task.url || ""); } catch (_) { /* Invalid stored links remain plain text. */ }
+                    if (url) {
+                        row.style.cursor = "pointer";
+                        row.addEventListener("click", event => {
+                            if (event.defaultPrevented || event.target.closest("a, button, input, select, textarea, label")) return;
+                            if (event.ctrlKey || event.metaKey) window.open(url, "_blank", "noopener");
+                            else location.assign(url);
+                        });
+                    }
+                    const actions = document.createElement("div");
+                    actions.className = "cg-task-actions";
+                    actions.append(actionButton(task.submitted ? "取消" : "提出", () => changeTask(task.id, false)),
+                    actionButton("編集", () => {
+                        try {
+                            const latest = readOriginalTasks().find(saved => saved.id === task.id);
+                            if (latest) edit(latest);
+                        } catch (error) { window.alert(error.message); }
+                    }), actionButton("削除", () => changeTask(task.id, true)));
+                    const actionIcons = {
+                        "提出": '<path d="m5 12 4 4L19 6"/>',
+                        "取消": '<path d="m9 4-5 5 5 5M4 9h10a6 6 0 0 1 0 12"/>',
+                        "編集": '<path d="m16 3 5 5-12 12-6 1 1-6ZM14 5l5 5"/>',
+                        "削除": '<path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7"/>'
+                    };
+                    for (const button of actions.children) {
+                        const label = button.textContent;
+                        button.title = label;
+                        button.setAttribute("aria-label", label);
+                        button.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${actionIcons[label]}</svg>`;
+                        const caption = document.createElement("span");
+                        caption.textContent = label;
+                        button.appendChild(caption);
+                    }
+                    for (const label of labels) {
+                        const cell = row.insertCell();
+                        cell.dataset.label = label;
+                        if (/操作/.test(label)) cell.appendChild(actions);
+                        else if (/提出物種別/.test(label)) cell.textContent = "タスク";
+                        else if (/講義名/.test(label)) cell.textContent = task.subject;
+                        else if (/学期|曜日|時限/.test(label)) cell.textContent = "";
+                        else if (/タイトル/.test(label)) {
+                            if (url) {
+                                const link = document.createElement("a");
+                                link.textContent = task.title;
+                                link.href = url;
+                                cell.appendChild(link);
+                            } else cell.textContent = task.title;
+                        } else if (/提出期間/.test(label)) {
+                            cell.style.textAlign = "center";
+                            const displayDate = value => originalTaskDate(value).replace(/-/g, "/").replace("T", " ");
+                            const endDate = displayDate(task.end);
+                            const endTime = document.createElement("span");
+                            endTime.textContent = endDate.slice(-5);
+                            if (new Date(task.end + 9 * 3600000).getUTCHours() < 12) Object.assign(endTime.style, { color: "red", fontWeight: "bold" });
+                            const timer = document.createElement("div");
+                            timer.className = "timer";
+                            timer.dataset.deadline = String(task.end);
+                            renderDeadlineCountdown(timer, task.end - now);
+                            cell.append(document.createTextNode(`${displayDate(task.start)} ～ ${endDate.slice(0, -5)}`),
+                                endTime, document.createElement("br"), timer);
+                        } else if (/提出状況/.test(label)) {
+                            const status = document.createElement("span");
+                            status.className = task.submitted ? "c-status-done" : "c-status-yet";
+                            status.textContent = task.submitted ? "提出済" : "未提出";
+                            cell.appendChild(status);
+                        }
+                        else if (/状態/.test(label)) cell.textContent = isOriginalTaskOpen(task, now) ? "受付中" : "受付前";
+                    }
+                    // Keep actions accessible if the original hide column is not available yet.
+                    if (!actions.parentElement) row.cells[0]?.appendChild(actions);
+                    tbody.appendChild(row);
+                }
+                Array.from(tbody.rows).sort((a, b) => {
+                    const deadline = row => homeTaskDeadline(row.querySelector('td[data-label*="提出期間"]')?.textContent || "") || 0;
+                    return deadline(a) - deadline(b);
+                }).forEach(row => tbody.appendChild(row));
+            } catch (error) {
+                console.warn("[CG] オリジナルタスクの表示失敗", error);
+            }
+        };
+        window.addEventListener("cg-original-tasks-changed", refresh);
+        window.addEventListener("storage", event => { if (event.key === originalTasksStorageKey || event.key === null) refresh(); });
+        refresh();
+        setInterval(refresh, 1000);
+    }
+
     const hiddenTasksStorageKey = "cg-hidden-tasks";
     const sameHiddenTask = (a, b) => a.submissionType === b.submissionType &&
         a.subject === b.subject && a.title === b.title;
@@ -1054,36 +1350,12 @@
             migrateGradeStorage();
         }
         installReferenceTimetableOrder();
+        installOriginalTaskCleanup();
 
         if (document.title === "ホーム画面（学生・保護者）") {
             const indexMainVisualUserLastLogin = document.getElementsByClassName("index-main-visual-user-last-login")[0];
             indexMainVisualUserLastLogin.innerHTML += ` | <a href="${updateURL}" title="Comfortable Gakujo をアップデート"><span style="display: inline-block; text-decoration: underline; color: blue"">Comfortable Gakujo v${version}</span></a>`;
 
-            observeUntilReady(() => {
-                const countElement = document.getElementsByClassName("count")[0];
-                if (countElement) {
-                    const countText = countElement.innerText;
-                    const match = countText.match(/(\d+)件/);
-                    let originalCount = 0;
-                    if (match) {
-                        originalCount = parseInt(match[1], 10);
-                    }
-                    const hiddenTasks = getHiddenTasks();
-                    const now = new Date();
-                    let hiddenCount = 0;
-                    hiddenTasks.forEach(task => {
-                        const submittalTerm = new Date(task.submittalTerm.split("～")[1].trim());
-                        if (submittalTerm > now && task.submittalStatus === "未提出") {
-                            hiddenCount++;
-                        }
-                    });
-                    if (hiddenCount > 0) {
-                        countElement.innerHTML = `<span class="num">${originalCount - hiddenCount}</span>件 + <span style="color: gray;">${hiddenCount}件</span>`;
-                    }
-                    return true;
-                }
-                return false;
-            });
             showUpdateNotice();
             void checkGradeUpdates();
 
@@ -1293,6 +1565,7 @@
                 `;
             document.head.appendChild(style);
             indexNoticeOtherItems.appendChild(li);
+            installHomeTaskCount();
             installHomeTaskCountdown();
 
             window.addEventListener('change', (e) => {
@@ -1313,6 +1586,12 @@
         } else if (document.title === "課題・アンケートリスト") {
             let processedSet = new WeakSet();
             let hiddenCount = 0;
+            let originalTasksInstalled = false;
+            const installTasks = () => {
+                if (originalTasksInstalled) return;
+                originalTasksInstalled = true;
+                installOriginalTasksTable();
+            };
 
             const addHideButtonColumn = () => {
                 const table = document.getElementById("dataTable01");
@@ -1323,13 +1602,15 @@
                     const th = document.createElement('th');
                     th.className = 'hidebutton-header';
                     th.style.width = "32px";
-                    th.innerHTML = "非表示<br>にする"
+                    th.textContent = "操作";
+                    th.title = "通常の課題は非表示、タスクは編集・削除・提出状況の切り替え";
                     thead.querySelector("tr").insertBefore(th, thead.querySelector("tr").firstChild);
                 }
 
                 const tbody = table.querySelector("tbody");
                 if (tbody) {
-                    tbody.querySelectorAll("tr").forEach(row => {
+                    tbody.querySelectorAll("tr:not([data-cg-original-task])").forEach(row => {
+                        if (row.querySelector(".dataTables_empty")) return;
                         if (!row.querySelector('.row-hidebutton')) {
                             const td = document.createElement('td');
                             td.style.textAlign = 'center';
@@ -1338,6 +1619,7 @@
                             btn.type = 'button';
                             btn.name = 'row-hidebutton';
                             btn.value = '−';
+                            btn.title = '非表示にする';
                             btn.className = 'row-hidebutton';
                             btn.style.width = '24px';
                             btn.style.height = '24px';
@@ -1387,6 +1669,9 @@
                 if (!originalTable) return;
                 const hiddenTasksTable = originalTable.cloneNode(true);
                 if (!hiddenTasksTable) return;
+                document.getElementById("hiddenTasksTable")?.closest("details")?.remove();
+                hiddenCount = 0;
+                hiddenTasksTable.querySelectorAll("tr[data-cg-original-task]").forEach(row => row.remove());
                 hiddenTasksTable.id = "hiddenTasksTable";
                 hiddenTasksTable.style.marginTop = "2em";
 
@@ -1478,11 +1763,11 @@
                 const tbody = table?.querySelector("tbody");
                 if (!tbody) return;
 
-                tbody.querySelectorAll("tr").forEach((row, index) => {
+                tbody.querySelectorAll("tr:not([data-cg-original-task])").forEach((row, index) => {
                     row.id = `cg-task-row-${index}`;
                 });
 
-                const rows = Array.from(tbody.querySelectorAll("tr"));
+                const rows = Array.from(tbody.querySelectorAll("tr:not([data-cg-original-task])"));
                 rows.sort((a, b) => getDeadlineDate(a) - getDeadlineDate(b)).forEach(row => {
                     tbody.appendChild(row);
                 });
@@ -1527,6 +1812,7 @@
 
                     timer.dataset.deadline = deadline.getTime().toString();
                 }
+                installTasks();
             };
 
             const debounce = (fn, delay = 300) => {
@@ -1570,12 +1856,18 @@
                 const tbody = table?.querySelector("tbody");
                 const lengthSelect = document.querySelector('select[name="dataTable01_length"]');
 
-                if (table && tbody && tbody.querySelectorAll("tr").length > 0 && lengthSelect) {
+                if (table && tbody && lengthSelect) {
                     triggerLengthChangeAndWait();
                     return true;
                 }
                 return false;
             });
+
+            // Tables without a length selector (including empty lists) can be used directly.
+            if (!document.querySelector('select[name="dataTable01_length"]')) {
+                addHideButtonColumn();
+                installTasks();
+            }
 
             setInterval(() => {
                 const now = Date.now();
