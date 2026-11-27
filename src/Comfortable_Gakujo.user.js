@@ -20,6 +20,362 @@
     const version = "1.13.0";
     const updateURL = "https://github.com/woody-1227/Comfortable-Gakujo/raw/main/src/Comfortable_Gakujo.user.js";
 
+    const PAGE_TITLES = {
+        home: ["ホーム画面（学生・保護者）", "Home Screen(Student and Guarantor)"],
+        taskList: ["課題・アンケートリスト", "Assignment/ Questionnaire List"],
+        taskDetail: ["課題・アンケート詳細", "Assignment/ Questionnaire Details"],
+        gradeDashboard: ["成績ダッシュボード", "Result Dashboard"],
+        gradeInfo: ["成績情報", "成績情報詳細", "Report Information"],
+        classReference: ["授業参考情報", "Class Reference Information"],
+        courseRegistration: ["履修登録", "Course Registration"],
+        notificationList: ["連絡一覧", "Notification List"]
+    };
+
+    const ENGLISH_TITLES = new Set([
+        PAGE_TITLES.home[1],
+        PAGE_TITLES.taskList[1],
+        PAGE_TITLES.taskDetail[1],
+        PAGE_TITLES.gradeDashboard[1],
+        PAGE_TITLES.gradeInfo[2],
+        PAGE_TITLES.courseRegistration[1],
+        PAGE_TITLES.notificationList[1]
+    ]);
+
+    const TASK_COLUMN_LABELS = {
+        action: ["操作", "Action"],
+        type: ["提出物種別", "Submission Type"],
+        subject: ["講義名", "Subject"],
+        term: ["学期", "曜日", "時限", "Semester", "Day of the Week", "Period"],
+        title: ["タイトル", "Title"],
+        period: ["提出期間", "Submission Period"],
+        status: ["提出状況", "Submission Status"],
+        condition: ["状態", "Conditions"]
+    };
+
+    const GRADE_REPORT_TERM_LABELS = ["成績報告時期", "Result Report Term"];
+
+    const BUTTON_MATCHERS = {
+        gradeDetails: {
+            texts: ["成績情報詳細", "Results Information Details"],
+            actionPattern: /SC_15005B00_01\/gredeInformation/
+        },
+        creditInfo: {
+            texts: ["単位修得情報照会", "Credit Acquisition Information Reference"]
+        }
+    };
+
+    const STATUS_TEXTS = {
+        unsubmitted: ["未提出", "Unsubmitted"],
+        submitted: ["提出済", "Submitted"]
+    };
+
+    const UI_TEXT = {
+        ja: {
+            countUnit: "件",
+            unsubmittedTitle: "未提出課題",
+            gradeNoticeButton: "成績が更新されました",
+            gradeNoticeToggleTitle: "成績更新通知",
+            updateLinkTitle: "Comfortable Gakujo をアップデート",
+            formatTimeLeft: (d, h, m, s) => `残り ${d > 0 ? `${d}日 ` : ""}${h}時間 ${m}分 ${s}秒`,
+            deadlineExpired: "締切済み",
+            nearestDeadlineHeading: "最も近い締め切り",
+            noUpcomingTasks: "締切前の課題はありません",
+            bgSettingsButton: "背景設定",
+            bgDialogCloseAria: "設定を閉じる",
+            bgDialogCloseTitle: "閉じる",
+            bgDialogTitle: "背景をカスタマイズ",
+            bgDialogSubtitle: "締め切りの状況に合わせて、トップページの雰囲気を変えられます。",
+            bgModeLabel: "表示範囲",
+            bgModeHeader: "横長（ヘッダー）",
+            bgModeFull: "画面全体",
+            bgStateLabel: "設定する状態",
+            bgStateNormal: "通常（3日以上）",
+            bgStateWarning: "締切まで1日以上・3日未満",
+            bgStateCritical: "締切まで1日未満",
+            bgStateNone: "課題なし（締切前の課題なし）",
+            bgFileLabel: "背景画像",
+            bgPreviewCaption: "プレビュー · 中央を基準に表示範囲に合わせます",
+            bgPreviewAria: "背景画像のプレビュー",
+            bgDefaultNote: "画像未設定の場合、通常は標準画像、締切まで3日未満の場合は警告柄、課題なしは通常の画像を使用します。",
+            bgResetButton: "この状態の画像を解除",
+            bgPagePreviewButton: "ページでプレビュー",
+            bgCancelButton: "キャンセル",
+            bgSaveButton: "変更を保存",
+            bgPreviewBarStatus: "背景をプレビュー中（未保存）",
+            bgPreviewBarReturn: "設定に戻る",
+            bgLoading: "読み込み中…",
+            bgLoadError: "画像を読み込めませんでした。別の画像を選択してください。",
+            bgQuotaError: "保存容量が不足しています。画像を小さくするか、ほかの状態の画像を解除してください。",
+            timetableDays: ["月", "火", "水", "木", "金", "土", "日"],
+            formatClassPeriod: classes => `${classes.join("・")}コマ`,
+            formatDayPeriod: (dayName, period) => `${dayName}曜 ${period}`,
+            formatDayGroup: dayName => `${dayName}曜日`,
+            timetableUnconfirmed: "曜日・時限未確認",
+            timetableJoiner: "、",
+            taskModalTitle: "オリジナルタスク",
+            taskModalNote: "提出物種別：タスク ／ 状態：提出期間内は受付中、開始前は受付前",
+            taskTitleLabel: "タイトル（必須）",
+            taskSubjectLabel: "講義名",
+            taskStartLabel: "提出開始（日本時間・必須）",
+            taskEndLabel: "提出期限（日本時間・必須）",
+            taskStatusLabel: "提出状況",
+            taskUnsubmitted: "未提出",
+            taskSubmitted: "提出済み",
+            taskSubmittedShort: "提出済",
+            taskUrlLabel: "レポート提出画面のリンク（任意）",
+            taskDeleteNote: "提出期限になると、提出済みのタスクもこのブラウザの保存データから削除します。",
+            taskSaveButton: "保存",
+            taskAddButton: "＋ タスクを追加",
+            taskTypeLabel: "タスク",
+            taskConditionOpen: "受付中",
+            taskConditionUpcoming: "受付前",
+            taskActionSubmit: "提出",
+            taskActionUndo: "取消",
+            taskActionEdit: "編集",
+            taskActionDelete: "削除",
+            taskErrEndAfterStart: "提出期限は提出開始より後にしてください。",
+            taskErrEndFuture: "提出期限は現在より後にしてください。",
+            taskErrTitleRequired: "タイトルを入力してください。",
+            taskErrMissing: "このタスクは期限切れまたは別のタブで削除されました。閉じて一覧を確認してください。",
+            taskErrSavePrefix: "保存できませんでした：",
+            taskErrUpdatePrefix: "タスクを更新できませんでした：",
+            confirmTaskDelete: title => `「${title}」を削除しますか？`,
+            colAction: "操作",
+            colActionTitle: "通常の課題は非表示、タスクは編集・削除・提出状況の切り替え",
+            hideButtonTitle: "非表示にする",
+            showHeaderHtml: "表示<br>する",
+            hiddenSummary: "非表示にした課題・アンケート ",
+            gradeFilterLabel: "年度・期：",
+            gradeFilterAll: "すべて表示",
+            formatGradeYear: y => `${y}年度`,
+            formatGradeTerm: (y, s) => `${y}年度 ${s}`,
+            markAllRead: "すべて既読にする",
+            previewButton: "ファイルをプレビュー",
+            previewLoading: "読み込み中...",
+            previewLoadFailed: "読み込みに失敗しました。",
+            previewFormFailed: "フォームの送信を検知できませんでした。",
+            navSyllabus: "シラバス",
+            navClassInfo: "授業情報",
+            navTasks: "課題提出",
+            navRegistration: "履修登録",
+            navGrades: "成績",
+            navCredits: "単位情報",
+            errCreditFetch: "単位情報を取得できませんでした。成績メニューから開くか、再ログイン後にお試しください。",
+            errGradeOpen: "成績情報を開けませんでした。再ログイン後にお試しください。",
+            errPageFetch: "ページ取得に失敗しました。再ログインが必要な可能性があります。"
+        },
+        en: {
+            countUnit: " Cases",
+            unsubmittedTitle: "Unsubmitted",
+            gradeNoticeButton: "Grades have been updated",
+            gradeNoticeToggleTitle: "Grade Updates",
+            updateLinkTitle: "Update Comfortable Gakujo",
+            formatTimeLeft: (d, h, m, s) => `${d > 0 ? `${d}d ` : ""}${h}h ${m}m ${s}s left`,
+            deadlineExpired: "Closed",
+            nearestDeadlineHeading: "Nearest Deadline",
+            noUpcomingTasks: "No upcoming deadlines",
+            bgSettingsButton: "Background",
+            bgDialogCloseAria: "Close settings",
+            bgDialogCloseTitle: "Close",
+            bgDialogTitle: "Customize Background",
+            bgDialogSubtitle: "Change the home screen background based on upcoming deadlines.",
+            bgModeLabel: "Display Area",
+            bgModeHeader: "Header Banner",
+            bgModeFull: "Full Screen",
+            bgStateLabel: "Target State",
+            bgStateNormal: "Normal (3+ days left)",
+            bgStateWarning: "Warning (1–3 days left)",
+            bgStateCritical: "Critical (< 1 day left)",
+            bgStateNone: "No Tasks (no upcoming deadlines)",
+            bgFileLabel: "Background Image",
+            bgPreviewCaption: "Preview · Centered and scaled to cover the display area",
+            bgPreviewAria: "Background image preview",
+            bgDefaultNote: "When unset, the default image is used for Normal/No Tasks, and warning stripes are shown for < 3 days.",
+            bgResetButton: "Clear This Image",
+            bgPagePreviewButton: "Preview on Page",
+            bgCancelButton: "Cancel",
+            bgSaveButton: "Save Changes",
+            bgPreviewBarStatus: "Previewing background (unsaved)",
+            bgPreviewBarReturn: "Back to Settings",
+            bgLoading: "Loading…",
+            bgLoadError: "Failed to load the image. Please choose another file.",
+            bgQuotaError: "Storage quota exceeded. Please use a smaller image or clear other state images.",
+            timetableDays: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+            formatClassPeriod: classes => `Period ${classes.join(", ")}`,
+            formatDayPeriod: (dayName, period) => `${dayName} ${period}`,
+            formatDayGroup: dayName => dayName,
+            timetableUnconfirmed: "Day / Period Unconfirmed",
+            timetableJoiner: ", ",
+            taskModalTitle: "Custom Task",
+            taskModalNote: "Type: Task / Conditions: Open during submission period, Upcoming before start",
+            taskTitleLabel: "Title (Required)",
+            taskSubjectLabel: "Subject",
+            taskStartLabel: "Start Time (JST, Required)",
+            taskEndLabel: "Deadline (JST, Required)",
+            taskStatusLabel: "Submission Status",
+            taskUnsubmitted: "Unsubmitted",
+            taskSubmitted: "Submitted",
+            taskSubmittedShort: "Submitted",
+            taskUrlLabel: "Submission Page URL (Optional)",
+            taskDeleteNote: "Tasks (including submitted ones) are automatically removed from browser storage after their deadline.",
+            taskSaveButton: "Save",
+            taskAddButton: "＋ Add Task",
+            taskTypeLabel: "Task",
+            taskConditionOpen: "Open",
+            taskConditionUpcoming: "Upcoming",
+            taskActionSubmit: "Submit",
+            taskActionUndo: "Undo",
+            taskActionEdit: "Edit",
+            taskActionDelete: "Delete",
+            taskErrEndAfterStart: "Deadline must be after the start time.",
+            taskErrEndFuture: "Deadline must be in the future.",
+            taskErrTitleRequired: "Please enter a title.",
+            taskErrMissing: "This task has expired or was deleted in another tab. Close and refresh the list.",
+            taskErrSavePrefix: "Could not save: ",
+            taskErrUpdatePrefix: "Could not update task: ",
+            confirmTaskDelete: title => `Delete "${title}"?`,
+            colAction: "Action",
+            colActionTitle: "Hide regular assignments, or edit/delete/toggle custom tasks",
+            hideButtonTitle: "Hide",
+            showHeaderHtml: "Show",
+            hiddenSummary: "Hidden Assignments / Questionnaires ",
+            gradeFilterLabel: "Year / Term: ",
+            gradeFilterAll: "Show All",
+            formatGradeYear: y => `${y}`,
+            formatGradeTerm: (y, s) => `${y} ${s === "前期" ? "1st Semester" : "2nd Semester"}`,
+            markAllRead: "Mark All as Read",
+            previewButton: "Preview File",
+            previewLoading: "Loading...",
+            previewLoadFailed: "Failed to load file.",
+            previewFormFailed: "Could not intercept form submission.",
+            navSyllabus: "Syllabus",
+            navClassInfo: "Class Info",
+            navTasks: "Assignments",
+            navRegistration: "Registration",
+            navGrades: "Grades",
+            navCredits: "Credits",
+            errCreditFetch: "Could not load credit information. Please open it from the Grades menu or try again after logging in.",
+            errGradeOpen: "Could not open grade information. Please try again after logging in.",
+            errPageFetch: "Failed to fetch the page. You may need to log in again."
+        }
+    };
+
+    const loggedWarnings = new Set();
+    function warnOnce(id, ...args) {
+        if (loggedWarnings.has(id)) return;
+        loggedWarnings.add(id);
+        console.warn(...args);
+    }
+
+    function isPage(doc, key) {
+        const candidates = PAGE_TITLES[key];
+        if (!candidates) {
+            warnOnce(`page:${key}`, `[CG][i18n] Unknown page key "${key}" in PAGE_TITLES`);
+            return false;
+        }
+        const title = doc?.title || "";
+        if (key === "classReference") return candidates.some(candidate => title.includes(candidate));
+        return candidates.includes(title);
+    }
+
+    function detectLocale(doc = document) {
+        const title = doc?.title || "";
+        if (ENGLISH_TITLES.has(title) || title.includes(PAGE_TITLES.classReference[1])) {
+            try { sessionStorage.setItem("cg_locale", "en"); } catch (_) { /* ignore */ }
+            return "en";
+        }
+        if (Object.values(PAGE_TITLES).some(list => list[0] && title.includes(list[0]))) {
+            try { sessionStorage.setItem("cg_locale", "ja"); } catch (_) { /* ignore */ }
+            return "ja";
+        }
+        if (doc?.querySelector('td[data-label="Submission Period"], td[data-label="Result Report Term"]')) return "en";
+        if (doc?.querySelector(".c-gnav-link")?.textContent?.trim() === "Home") return "en";
+        try {
+            if (sessionStorage.getItem("cg_locale") === "en") return "en";
+        } catch (_) { /* ignore */ }
+        return "ja";
+    }
+
+    function t(key, ...args) {
+        const locale = detectLocale(document);
+        const dict = UI_TEXT[locale] || UI_TEXT.ja;
+        let value = dict[key];
+        if (value === undefined) {
+            if (locale !== "ja" && UI_TEXT.ja[key] !== undefined) {
+                warnOnce(`i18n:${locale}:${key}`, `[CG][i18n] Missing "${locale}" translation for "${key}", falling back to "ja".`);
+                value = UI_TEXT.ja[key];
+            } else {
+                warnOnce(`i18n:missing:${key}`, `[CG][i18n] Unknown UI_TEXT key "${key}".`);
+                return String(key);
+            }
+        }
+        return typeof value === "function" ? value(...args) : value;
+    }
+
+    function findButtonByMatcher(doc, matcher) {
+        const buttons = Array.from(doc.querySelectorAll(".c-btn-submit01"));
+        const found = buttons.find(control => {
+            const text = control.textContent.trim();
+            if (matcher.texts?.includes(text)) return true;
+            if (matcher.actionPattern) {
+                const actionSource = `${control.getAttribute("onclick") || ""} ${control.getAttribute("formaction") || ""}`;
+                if (matcher.actionPattern.test(actionSource)) return true;
+            }
+            return false;
+        });
+        if (!found) {
+            const available = buttons.map(b => b.textContent.trim()).filter(Boolean);
+            warnOnce(`btn:${matcher.texts?.join("|")}`, `[CG][i18n] Button not found (${matcher.texts?.join(" / ")}). Available:`, available);
+        }
+        return found || null;
+    }
+
+    function findTaskCell(row, columnKey) {
+        const patterns = TASK_COLUMN_LABELS[columnKey];
+        if (!patterns) {
+            warnOnce(`taskColKey:${columnKey}`, `[CG][i18n] Unknown task column key "${columnKey}".`);
+            return null;
+        }
+        return Array.from(row.querySelectorAll("td[data-label]")).find(cell => {
+            const label = cell.getAttribute("data-label") || "";
+            return patterns.some(pattern => label.includes(pattern));
+        }) || null;
+    }
+
+    function classifyTaskColumnLabel(label) {
+        const found = Object.keys(TASK_COLUMN_LABELS).find(key =>
+            TASK_COLUMN_LABELS[key].some(pattern => label.includes(pattern))
+        ) || null;
+        if (!found && label) {
+            warnOnce(`taskColLabel:${label}`, `[CG][i18n] Unrecognized task column data-label "${label}".`);
+        }
+        return found;
+    }
+
+    function findGradeTermCell(container) {
+        const cells = Array.from(container.querySelectorAll("td[data-label]"));
+        const found = cells.find(cell =>
+            GRADE_REPORT_TERM_LABELS.includes(cell.getAttribute("data-label")?.trim())
+        ) || null;
+        if (!found && cells.length > 0) {
+            const labels = Array.from(new Set(cells.map(c => c.getAttribute("data-label")).filter(Boolean)));
+            warnOnce("gradeTermCell", "[CG][i18n] Grade report term cell not found. Available data-labels:", labels);
+        }
+        return found;
+    }
+
+    function isTaskSubmittedCell(cell) {
+        if (!cell) return false;
+        if (cell.querySelector(".c-status-done")) return true;
+        const text = cell.textContent.trim();
+        return STATUS_TEXTS.submitted.some(status => text.includes(status));
+    }
+
+    function isUnsubmittedStatusText(text) {
+        const trimmed = (text || "").trim();
+        return STATUS_TEXTS.unsubmitted.includes(trimmed);
+    }
+
     function waitForDomStability({
         timeout = 10000,
         stableTime = 500
@@ -95,11 +451,11 @@
 
             console.log("[CG] DOM stabilized");
 
-            if (document.title === "ホーム画面（学生・保護者）") {
+            if (isPage(document, "home")) {
                 await waitForSelector(".index-container");
             }
 
-            if (document.title === "課題・アンケートリスト") {
+            if (isPage(document, "taskList")) {
                 await waitForSelector("#dataTable01");
             }
 
@@ -188,7 +544,7 @@
         }
         const response = await fetch(url, options);
         if (!response.ok || new URL(response.url).origin !== location.origin) {
-            throw new Error("ページ取得に失敗しました。再ログインが必要な可能性があります。");
+            throw new Error(t("errPageFetch"));
         }
         const doc = new DOMParser().parseFromString(await response.text(), "text/html");
         return { doc, url: new URL(doc.querySelector("base[href]")?.getAttribute("href") || response.url, response.url).href };
@@ -199,11 +555,11 @@
         button.dataset.cgBusy = "1";
         try {
             const info = await fetchGradeInfo();
-            const request = pageSubmission(info.doc, info.url, Array.from(info.doc.querySelectorAll(".c-btn-submit01")).find(control => control.textContent.trim() === "単位修得情報照会"));
+            const request = pageSubmission(info.doc, info.url, findButtonByMatcher(info.doc, BUTTON_MATCHERS.creditInfo));
             submitPage(request);
         } catch (error) {
             console.warn("[CG] 単位情報取得失敗", error);
-            alert("単位情報を取得できませんでした。成績メニューから開くか、再ログイン後にお試しください。");
+            alert(t("errCreditFetch"));
         } finally {
             delete button.dataset.cgBusy;
         }
@@ -211,12 +567,11 @@
 
     async function fetchGradeInfo() {
         const dashboard = await fetchPage(explicitSubmission(document, location.href, "emptyForm", "SC_15005B00_01/init"));
-        if (dashboard.doc.title !== "成績ダッシュボード") throw new Error("成績ダッシュボードを取得できませんでした。");
-        const detail = Array.from(dashboard.doc.querySelectorAll(".c-btn-submit01")).find(control =>
-            control.textContent.trim() === "成績情報詳細");
+        if (!isPage(dashboard.doc, "gradeDashboard")) throw new Error("成績ダッシュボードを取得できませんでした。");
+        const detail = findButtonByMatcher(dashboard.doc, BUTTON_MATCHERS.gradeDetails);
         const request = pageSubmission(dashboard.doc, dashboard.url, detail);
         const info = await fetchPage(request);
-        if (!["成績情報", "成績情報詳細"].includes(info.doc.title)) throw new Error("成績情報を取得できませんでした。");
+        if (!isPage(info.doc, "gradeInfo")) throw new Error("成績情報を取得できませんでした。");
         return info;
     }
 
@@ -247,13 +602,12 @@
             // A pending background check must finish before starting navigation.
             while (gradeCheckRunning) await new Promise(resolve => setTimeout(resolve, 100));
             const dashboard = await fetchPage(explicitSubmission(document, location.href, "emptyForm", "SC_15005B00_01/init"));
-            if (dashboard.doc.title !== "成績ダッシュボード") throw new Error("成績ダッシュボードを取得できませんでした。");
-            const detail = Array.from(dashboard.doc.querySelectorAll(".c-btn-submit01")).find(control =>
-                control.textContent.trim() === "成績情報詳細");
+            if (!isPage(dashboard.doc, "gradeDashboard")) throw new Error("成績ダッシュボードを取得できませんでした。");
+            const detail = findButtonByMatcher(dashboard.doc, BUTTON_MATCHERS.gradeDetails);
             submitPage(pageSubmission(dashboard.doc, dashboard.url, detail));
         } catch (error) {
             console.warn("[CG] 成績画面表示失敗", error);
-            alert("成績情報を開けませんでした。再ログイン後にお試しください。");
+            alert(t("errGradeOpen"));
         } finally {
             delete button.dataset.cgBusy;
             button.disabled = false;
@@ -262,7 +616,7 @@
 
     function gradeSnapshot(doc) {
         const table = doc.getElementById("02");
-        if (!table || !table.querySelector('td[data-label="成績報告時期"]')) {
+        if (!table || !findGradeTermCell(table)) {
             throw new Error("成績明細の表を確認できませんでした。");
         }
         // Ignore sorting, pagination controls, and presentation-only whitespace.
@@ -281,7 +635,7 @@
         try {
             // Compare only the same server-rendered source. The displayed table
             // may have been paginated or altered by the site's scripts.
-            if (document.title !== "ホーム画面（学生・保護者）") return;
+            if (!isPage(document, "home")) return;
             const { doc: gradeDoc } = await fetchGradeInfo();
             const hash = "detail-v2:" + await sha256(JSON.stringify(gradeSnapshot(gradeDoc)));
             if (localStorage.getItem("cg_grade_save_enabled") !== "1") return;
@@ -303,7 +657,7 @@
 
     function showUpdateNotice() {
         if (localStorage.getItem("cg_grade_updated") !== "1") return (false);
-        if (document.title !== "ホーム画面（学生・保護者）") return (false);
+        if (!isPage(document, "home")) return (false);
         if (document.getElementsByClassName("cg-grade-notice-container").length > 0) return (false);
 
         const indexContainer = document.getElementsByClassName("index-container")[0];
@@ -311,7 +665,7 @@
 
         const notice = document.createElement("div");
         notice.className = "cg-grade-notice-container";
-        notice.innerHTML = `<button type="button" class="cg-grade-notice-button c-main-menu-btn"><i class="c-icon-notice" aria-hidden="true" style="margin-right: 0.5em"></i>成績が更新されました</button>`;
+        notice.innerHTML = `<button type="button" class="cg-grade-notice-button c-main-menu-btn"><i class="c-icon-notice" aria-hidden="true" style="margin-right: 0.5em"></i>${t("gradeNoticeButton")}</button>`;
 
         notice.querySelector("button").addEventListener("click", event => {
             event.preventDefault();
@@ -400,16 +754,15 @@
         const h = Math.floor(ms / (1000 * 60 * 60)) % 24;
         const m = Math.floor(ms / (1000 * 60)) % 60;
         const s = Math.floor(ms / 1000) % 60;
-        const dayStr = d > 0 ? `${d}日 ` : '';
         const digits = precision === true ? 1 : precision === 2 ? 2 : 0;
         const fraction = digits ? `.${Math.floor((ms % 1000) / (10 ** (3 - digits))).toString().padStart(digits, '0')}` : '';
         const seconds = s.toString().padStart(2, '0') + fraction;
-        return `残り ${dayStr}${h.toString().padStart(2, '0')}時間 ${m.toString().padStart(2, '0')}分 ${seconds}秒`;
+        return t("formatTimeLeft", d, h.toString().padStart(2, '0'), m.toString().padStart(2, '0'), seconds);
     }
 
     function renderDeadlineCountdown(timer, remaining, precision = 0) {
         const expired = remaining <= 0;
-        timer.textContent = expired ? "締切済み" : formatTimeLeft(remaining, precision);
+        timer.textContent = expired ? t("deadlineExpired") : formatTimeLeft(remaining, precision);
         Object.assign(timer.style, {
             color: remaining < 86400000 ? "red" : remaining < 3 * 86400000 ? "#FF8C00" : "",
             fontWeight: remaining < 3 * 86400000 ? "bold" : "",
@@ -589,22 +942,22 @@
         opener.id = "cg-header-uploader";
         opener.type = "button";
         opener.className = "cg-background-opener";
-        opener.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="0"/><circle cx="8" cy="8" r="1.5"/><path d="m3 17 5-5 4 4 4-6 5 7"/></svg><span>背景設定</span>`;
+        opener.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="0"/><circle cx="8" cy="8" r="1.5"/><path d="m3 17 5-5 4 4 4-6 5 7"/></svg><span>${t("bgSettingsButton")}</span>`;
         Object.assign(opener.style, { position:"absolute", top:"1rem", right:"1rem", zIndex:"9", minWidth:"auto" });
         visual.appendChild(opener);
         const dialog = document.createElement("dialog");
         dialog.id = "cg-background-dialog";
         dialog.setAttribute("aria-labelledby", "cg-background-title");
-        dialog.innerHTML = `<header class="cg-bg-header"><button type="button" id="cg-background-close" aria-label="設定を閉じる" title="閉じる">×</button><h2 id="cg-background-title">背景をカスタマイズ</h2><p class="cg-bg-caption">締め切りの状況に合わせて、トップページの雰囲気を変えられます。</p></header>
+        dialog.innerHTML = `<header class="cg-bg-header"><button type="button" id="cg-background-close" aria-label="${t("bgDialogCloseAria")}" title="${t("bgDialogCloseTitle")}">×</button><h2 id="cg-background-title">${t("bgDialogTitle")}</h2><p class="cg-bg-caption">${t("bgDialogSubtitle")}</p></header>
             <div class="cg-bg-body"><div class="cg-bg-fields">
-            <label>表示範囲 <select id="cg-background-mode"><option value="header">横長（ヘッダー）</option><option value="full">画面全体</option></select></label>
-            <label>設定する状態 <select id="cg-background-state"><option value="normal">通常（3日以上）</option><option value="warning">締切まで1日以上・3日未満</option><option value="critical">締切まで1日未満</option><option value="none">課題なし（締切前の課題なし）</option></select></label>
-            </div><label>背景画像 <input id="cg-background-file" type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/avif"></label>
-            <p class="cg-bg-caption">プレビュー · 中央を基準に表示範囲に合わせます</p><div id="cg-background-preview" role="img" aria-label="背景画像のプレビュー"></div>
-            <p class="cg-bg-caption">画像未設定の場合、通常は標準画像、締切まで3日未満の場合は警告柄、課題なしは通常の画像を使用します。</p>
+            <label>${t("bgModeLabel")} <select id="cg-background-mode"><option value="header">${t("bgModeHeader")}</option><option value="full">${t("bgModeFull")}</option></select></label>
+            <label>${t("bgStateLabel")} <select id="cg-background-state"><option value="normal">${t("bgStateNormal")}</option><option value="warning">${t("bgStateWarning")}</option><option value="critical">${t("bgStateCritical")}</option><option value="none">${t("bgStateNone")}</option></select></label>
+            </div><label>${t("bgFileLabel")} <input id="cg-background-file" type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/avif"></label>
+            <p class="cg-bg-caption">${t("bgPreviewCaption")}</p><div id="cg-background-preview" role="img" aria-label="${t("bgPreviewAria")}"></div>
+            <p class="cg-bg-caption">${t("bgDefaultNote")}</p>
             <p id="cg-background-error" role="status"></p>
-            </div><footer class="cg-bg-footer"><button type="button" id="cg-background-reset">この状態の画像を解除</button>
-            <button type="button" id="cg-background-page-preview">ページでプレビュー</button><button type="button" id="cg-background-cancel">キャンセル</button><button type="button" id="cg-background-save">変更を保存</button></footer>`;
+            </div><footer class="cg-bg-footer"><button type="button" id="cg-background-reset">${t("bgResetButton")}</button>
+            <button type="button" id="cg-background-page-preview">${t("bgPagePreviewButton")}</button><button type="button" id="cg-background-cancel">${t("bgCancelButton")}</button><button type="button" id="cg-background-save">${t("bgSaveButton")}</button></footer>`;
         document.body.appendChild(dialog);
         const mode = dialog.querySelector("#cg-background-mode");
         const state = dialog.querySelector("#cg-background-state");
@@ -615,7 +968,7 @@
         const previewBar = document.createElement("div");
         previewBar.id = "cg-background-preview-bar";
         previewBar.hidden = true;
-        previewBar.innerHTML = `<span role="status">背景をプレビュー中（未保存）</span><button type="button">設定に戻る</button>`;
+        previewBar.innerHTML = `<span role="status">${t("bgPreviewBarStatus")}</span><button type="button">${t("bgPreviewBarReturn")}</button>`;
         document.body.appendChild(previewBar);
         const returnToSettings = () => {
             pagePreview = null;
@@ -660,10 +1013,10 @@
             if (!selected) return;
             const current = ++generation, target = state.value;
             save.disabled = true;
-            error.textContent = "読み込み中…";
+            error.textContent = t("bgLoading");
             const fail = () => {
                 if (generation !== current) return;
-                error.textContent = "画像を読み込めませんでした。別の画像を選択してください。";
+                error.textContent = t("bgLoadError");
                 save.disabled = false;
             };
             const reader = new FileReader();
@@ -693,7 +1046,7 @@
         });
         save.addEventListener("click", () => {
             try { localStorage.setItem(key, JSON.stringify(draft)); }
-            catch (_) { error.textContent = "保存容量が不足しています。画像を小さくするか、ほかの状態の画像を解除してください。"; return; }
+            catch (_) { error.textContent = t("bgQuotaError"); return; }
             localStorage.removeItem("cg-header-image");
             settings = draft;
             apply();
@@ -812,7 +1165,7 @@
         `;
         document.head.appendChild(style);
         const title = document.createElement("div");
-        title.textContent = "最も近い締め切り";
+        title.textContent = t("nearestDeadlineHeading");
         title.className = "cg-deadline-heading";
         const timer = document.createElement("div");
         timer.className = "cg-deadline-clock";
@@ -866,10 +1219,10 @@
             notice.hidden = false;
             if (Number.isFinite(deadline)) {
                 renderClock(deadline - now);
-                timer.title = new Date(deadline).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" });
+                timer.title = new Date(deadline).toLocaleString(detectLocale() === "en" ? "en-US" : "ja-JP", { timeZone: "Asia/Tokyo" });
             } else {
                 updateBackground(Infinity);
-                timer.textContent = "締切前の課題はありません";
+                timer.textContent = t("noUpcomingTasks");
                 Object.assign(timer.style, { color: "", fontWeight: "", textDecoration: "" });
                 timer.removeAttribute("title");
             }
@@ -887,7 +1240,7 @@
             ? Array.from({ length: numbers[1] - numbers[0] + 1 }, (_, index) => numbers[0] + index)
             : numbers;
         const classes = Array.from(new Set(periods.map(number => Math.ceil(number / 2))));
-        return `${classes.join("・")}コマ`;
+        return t("formatClassPeriod", classes);
     }
 
     function collectTimetableOrder(doc) {
@@ -924,7 +1277,7 @@
         const valid = year === timetable.year && semester === timetable.semester && timetable.order.size > 0;
         const selected = select.value;
         const options = Array.from(select.options);
-        const days = ["月", "火", "水", "木", "金", "土", "日"];
+        const days = t("timetableDays");
         const entries = options.map((option, index) => {
             if (option.dataset.cgOriginalLabel === undefined) {
                 option.dataset.cgOriginalLabel = option.textContent;
@@ -934,12 +1287,12 @@
             const order = valid ? timetable.order.get(key) : undefined;
             const meetings = (timetable.slots?.get(key) || []).slice().sort((a, b) => a.order - b.order);
             const day = order === undefined ? undefined : Math.floor(order / 100);
-            const schedule = meetings.map(meeting => `${days[meeting.day]}曜 ${formatClassPeriod(meeting.period)}`).join("、");
+            const schedule = meetings.map(meeting => t("formatDayPeriod", days[meeting.day], formatClassPeriod(meeting.period))).join(t("timetableJoiner"));
             return {
                 option,
                 order: !valid ? Number(option.dataset.cgOriginalPosition) : !option.value ? -1 : order ?? Infinity,
                 index,
-                group: !valid || !option.value ? null : day === undefined ? "曜日・時限未確認" : `${days[day]}曜日`,
+                group: !valid || !option.value ? null : day === undefined ? t("timetableUnconfirmed") : t("formatDayGroup", days[day]),
                 label: schedule && valid ? `${schedule}｜${option.dataset.cgOriginalLabel}` : option.dataset.cgOriginalLabel
             };
         }).sort((a, b) => (a.order - b.order) || a.index - b.index);
@@ -971,11 +1324,11 @@
     }
 
     function installReferenceTimetableOrder() {
-        if (!document.title.includes("授業参考情報")) return;
+        if (!isPage(document, "classReference")) return;
         void (async () => {
             try {
                 const page = await fetchPage(explicitSubmission(document, location.href, "emptyForm", "SC_07002B00_01/initStudent"));
-                if (page.doc.title !== "履修登録") throw new Error("履修時間割を取得できませんでした。");
+                if (!isPage(page.doc, "courseRegistration")) throw new Error("履修時間割を取得できませんでした。");
                 const timetable = collectTimetableOrder(page.doc);
                 const sort = () => {
                     const year = document.getElementById("changeStartYearCmb")?.value;
@@ -1055,19 +1408,23 @@
                     if (!panel) return;
                     const item = document.createElement("li");
                     item.className = "index-notice-other-item";
-                    item.innerHTML = `<div class="index-main-visual-notice-box cg-index-notice-other-link"><p class="title">未提出課題</p><div class="content"><p class="count"><span class="num">0</span>件</p></div></div>`;
+                    item.innerHTML = `<div class="index-main-visual-notice-box cg-index-notice-other-link"><p class="title">${t("unsubmittedTitle")}</p><div class="content"><p class="count"><span class="num">0</span>${t("countUnit")}</p></div></div>`;
                     panel.prepend(item);
                     count = item.querySelector(".count");
                 }
                 if (!count) return;
-                if (!baseCounts.has(count)) baseCounts.set(count, Number(count.textContent.match(/(\d+)件/)?.[1] || 0));
+                if (!baseCounts.has(count)) {
+                    const numText = count.querySelector(".num")?.textContent || count.textContent.match(/\d+/)?.[0] || "0";
+                    baseCounts.set(count, Number(numText));
+                }
                 const original = baseCounts.get(count);
                 const hidden = Math.min(original, getHiddenTasks().filter(task => {
                     const deadline = homeTaskDeadline(task.submittalTerm);
-                    return deadline > now && task.submittalStatus === "未提出";
+                    return deadline > now && isUnsubmittedStatusText(task.submittalStatus);
                 }).length);
-                const html = `<span class="num" style="color: red;">${original - hidden + extra}</span>件` +
-                    (hidden ? ` + <span style="color: gray;">${hidden}件</span>` : "");
+                const unit = t("countUnit");
+                const html = `<span class="num" style="color: red;">${original - hidden + extra}</span>${unit}` +
+                    (hidden ? ` + <span style="color: gray;">${hidden}${unit}</span>` : "");
                 if (count.innerHTML !== html) count.innerHTML = html;
             } catch (error) { console.warn("[CG] 未提出タスク件数の表示失敗", error); }
         };
@@ -1106,17 +1463,17 @@
         const dialog = document.createElement("dialog");
         dialog.id = "cg-task-editor";
         dialog.innerHTML = `<form>
-            <h2>オリジナルタスク</h2>
-            <p>提出物種別：タスク ／ 状態：提出期間内は受付中、開始前は受付前</p>
-            <label>タイトル（必須）<input name="title" required maxlength="300"></label>
-            <label>講義名<input name="subject" maxlength="200"></label>
-            <label>提出開始（日本時間・必須）<input name="start" type="datetime-local" required></label>
-            <label>提出期限（日本時間・必須）<input name="end" type="datetime-local" required></label>
-            <label>提出状況<select name="submitted"><option value="0">未提出</option><option value="1">提出済み</option></select></label>
-            <label>レポート提出画面のリンク（任意）<input name="url" type="text" placeholder="https://..."></label>
-            <p>提出期限になると、提出済みのタスクもこのブラウザの保存データから削除します。</p>
+            <h2>${t("taskModalTitle")}</h2>
+            <p>${t("taskModalNote")}</p>
+            <label>${t("taskTitleLabel")}<input name="title" required maxlength="300"></label>
+            <label>${t("taskSubjectLabel")}<input name="subject" maxlength="200"></label>
+            <label>${t("taskStartLabel")}<input name="start" type="datetime-local" required></label>
+            <label>${t("taskEndLabel")}<input name="end" type="datetime-local" required></label>
+            <label>${t("taskStatusLabel")}<select name="submitted"><option value="0">${t("taskUnsubmitted")}</option><option value="1">${t("taskSubmitted")}</option></select></label>
+            <label>${t("taskUrlLabel")}<input name="url" type="text" placeholder="https://..."></label>
+            <p>${t("taskDeleteNote")}</p>
             <p class="cg-task-error" role="alert"></p>
-            <div class="cg-task-buttons"><button type="button" data-cg-cancel>キャンセル</button><button type="submit">保存</button></div>
+            <div class="cg-task-buttons"><button type="button" data-cg-cancel>${t("bgCancelButton")}</button><button type="submit">${t("taskSaveButton")}</button></div>
         </form>`;
         document.body.appendChild(dialog);
         const form = dialog.querySelector("form");
@@ -1140,18 +1497,18 @@
             try {
                 const start = homeTaskDeadline(field("start").value.replace("T", " "));
                 const end = homeTaskDeadline(field("end").value.replace("T", " "));
-                if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) throw new Error("提出期限は提出開始より後にしてください。");
-                if (end <= Date.now()) throw new Error("提出期限は現在より後にしてください。");
+                if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) throw new Error(t("taskErrEndAfterStart"));
+                if (end <= Date.now()) throw new Error(t("taskErrEndFuture"));
                 const title = field("title").value.trim();
-                if (!title) throw new Error("タイトルを入力してください。");
+                if (!title) throw new Error(t("taskErrTitleRequired"));
                 const tasks = readOriginalTasks();
-                if (editingId && !tasks.some(task => task.id === editingId)) throw new Error("このタスクは期限切れまたは別のタブで削除されました。閉じて一覧を確認してください。");
+                if (editingId && !tasks.some(task => task.id === editingId)) throw new Error(t("taskErrMissing"));
                 const task = { id: editingId || crypto.randomUUID(), title,
                     subject: field("subject").value.trim(),
                     start, end, submitted: field("submitted").value === "1", url: originalTaskLink(field("url").value) };
                 saveOriginalTasks([...tasks.filter(saved => saved.id !== task.id), task]);
                 dialog.close();
-            } catch (error) { errorElement.textContent = `保存できませんでした：${error.message}`; }
+            } catch (error) { errorElement.textContent = `${t("taskErrSavePrefix")}${error.message}`; }
         });
         const actionButton = (label, handler) => {
             const button = document.createElement("button");
@@ -1166,13 +1523,13 @@
                 const task = tasks.find(saved => saved.id === id);
                 if (!task) return;
                 if (remove) {
-                    if (!window.confirm(`「${task.title}」を削除しますか？`)) return;
+                    if (!window.confirm(t("confirmTaskDelete", task.title))) return;
                     saveOriginalTasks(tasks.filter(saved => saved.id !== id));
                 } else {
                     task.submitted = !task.submitted;
                     saveOriginalTasks(tasks);
                 }
-            } catch (error) { window.alert(`タスクを更新できませんでした：${error.message}`); }
+            } catch (error) { window.alert(`${t("taskErrUpdatePrefix")}${error.message}`); }
         };
         let previousSignature = "";
         let previousTable;
@@ -1185,9 +1542,9 @@
                 const toolbar = document.createElement("div");
                 toolbar.id = "cg-task-toolbar";
                 toolbar.className = "cg-task-toolbar c-filter_box c-form-box";
-                const addButton = actionButton("＋ タスクを追加", () => edit(null));
+                const addButton = actionButton(t("taskAddButton"), () => edit(null));
                 addButton.className = "c-btn c-btn-submit01";
-                addButton.innerHTML = '<span class="c-btn-link"><span class="c-btn-text">＋ タスクを追加</span></span>';
+                addButton.innerHTML = `<span class="c-btn-link"><span class="c-btn-text">${t("taskAddButton")}</span></span>`;
                 toolbar.appendChild(addButton);
                 table.before(toolbar);
             }
@@ -1202,7 +1559,7 @@
                 if (sample) sampleLabels = Array.from(sample.cells).filter(cell => cell.hasAttribute("data-label")).map(cell => cell.getAttribute("data-label"));
                 const headers = Array.from(table.querySelectorAll("thead tr:first-child th"));
                 let columnIndex = 0;
-                const labels = headers.map(header => header.classList.contains("hidebutton-header") ? "操作" : sampleLabels[columnIndex++] || header.textContent.replace(/\s+/g, "").trim());
+                const labels = headers.map(header => header.classList.contains("hidebutton-header") ? t("colAction") : sampleLabels[columnIndex++] || header.textContent.replace(/\s+/g, "").trim());
                 tbody.querySelectorAll("tr[data-cg-original-task]").forEach(row => row.remove());
                 tbody.querySelectorAll(".dataTables_empty").forEach(cell => { cell.parentElement.hidden = tasks.length > 0; });
                 for (const task of tasks) {
@@ -1221,18 +1578,21 @@
                     }
                     const actions = document.createElement("div");
                     actions.className = "cg-task-actions";
-                    actions.append(actionButton(task.submitted ? "取消" : "提出", () => changeTask(task.id, false)),
-                    actionButton("編集", () => {
+                    const submitLabel = task.submitted ? t("taskActionUndo") : t("taskActionSubmit");
+                    const editLabel = t("taskActionEdit");
+                    const deleteLabel = t("taskActionDelete");
+                    actions.append(actionButton(submitLabel, () => changeTask(task.id, false)),
+                    actionButton(editLabel, () => {
                         try {
                             const latest = readOriginalTasks().find(saved => saved.id === task.id);
                             if (latest) edit(latest);
                         } catch (error) { window.alert(error.message); }
-                    }), actionButton("削除", () => changeTask(task.id, true)));
+                    }), actionButton(deleteLabel, () => changeTask(task.id, true)));
                     const actionIcons = {
-                        "提出": '<path d="m5 12 4 4L19 6"/>',
-                        "取消": '<path d="m9 4-5 5 5 5M4 9h10a6 6 0 0 1 0 12"/>',
-                        "編集": '<path d="m16 3 5 5-12 12-6 1 1-6ZM14 5l5 5"/>',
-                        "削除": '<path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7"/>'
+                        [t("taskActionSubmit")]: '<path d="m5 12 4 4L19 6"/>',
+                        [t("taskActionUndo")]: '<path d="m9 4-5 5 5 5M4 9h10a6 6 0 0 1 0 12"/>',
+                        [editLabel]: '<path d="m16 3 5 5-12 12-6 1 1-6ZM14 5l5 5"/>',
+                        [deleteLabel]: '<path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7"/>'
                     };
                     for (const button of actions.children) {
                         const label = button.textContent;
@@ -1246,18 +1606,19 @@
                     for (const label of labels) {
                         const cell = row.insertCell();
                         cell.dataset.label = label;
-                        if (/操作/.test(label)) cell.appendChild(actions);
-                        else if (/提出物種別/.test(label)) cell.textContent = "タスク";
-                        else if (/講義名/.test(label)) cell.textContent = task.subject;
-                        else if (/学期|曜日|時限/.test(label)) cell.textContent = "";
-                        else if (/タイトル/.test(label)) {
+                        const colKey = classifyTaskColumnLabel(label);
+                        if (colKey === "action") cell.appendChild(actions);
+                        else if (colKey === "type") cell.textContent = t("taskTypeLabel");
+                        else if (colKey === "subject") cell.textContent = task.subject;
+                        else if (colKey === "term") cell.textContent = "";
+                        else if (colKey === "title") {
                             if (url) {
                                 const link = document.createElement("a");
                                 link.textContent = task.title;
                                 link.href = url;
                                 cell.appendChild(link);
                             } else cell.textContent = task.title;
-                        } else if (/提出期間/.test(label)) {
+                        } else if (colKey === "period") {
                             cell.style.textAlign = "center";
                             const displayDate = value => originalTaskDate(value).replace(/-/g, "/").replace("T", " ");
                             const endDate = displayDate(task.end);
@@ -1270,20 +1631,20 @@
                             renderDeadlineCountdown(timer, task.end - now);
                             cell.append(document.createTextNode(`${displayDate(task.start)} ～ ${endDate.slice(0, -5)}`),
                                 endTime, document.createElement("br"), timer);
-                        } else if (/提出状況/.test(label)) {
+                        } else if (colKey === "status") {
                             const status = document.createElement("span");
                             status.className = task.submitted ? "c-status-done" : "c-status-yet";
-                            status.textContent = task.submitted ? "提出済" : "未提出";
+                            status.textContent = task.submitted ? t("taskSubmittedShort") : t("taskUnsubmitted");
                             cell.appendChild(status);
                         }
-                        else if (/状態/.test(label)) cell.textContent = isOriginalTaskOpen(task, now) ? "受付中" : "受付前";
+                        else if (colKey === "condition") cell.textContent = isOriginalTaskOpen(task, now) ? t("taskConditionOpen") : t("taskConditionUpcoming");
                     }
                     // Keep actions accessible if the original hide column is not available yet.
                     if (!actions.parentElement) row.cells[0]?.appendChild(actions);
                     tbody.appendChild(row);
                 }
                 Array.from(tbody.rows).sort((a, b) => {
-                    const deadline = row => homeTaskDeadline(row.querySelector('td[data-label*="提出期間"]')?.textContent || "") || 0;
+                    const deadline = row => homeTaskDeadline(findTaskCell(row, "period")?.textContent || "") || 0;
                     return deadline(a) - deadline(b);
                 }).forEach(row => tbody.appendChild(row));
             } catch (error) {
@@ -1346,15 +1707,15 @@
 
     function startComfortableGakujo() {
         console.log("[CG] startComfortableGakujo (page fully loaded)");
-        if (["ホーム画面（学生・保護者）", "成績情報", "成績情報詳細"].includes(document.title)) {
+        if (isPage(document, "home") || isPage(document, "gradeInfo")) {
             migrateGradeStorage();
         }
         installReferenceTimetableOrder();
         installOriginalTaskCleanup();
 
-        if (document.title === "ホーム画面（学生・保護者）") {
+        if (isPage(document, "home")) {
             const indexMainVisualUserLastLogin = document.getElementsByClassName("index-main-visual-user-last-login")[0];
-            indexMainVisualUserLastLogin.innerHTML += ` | <a href="${updateURL}" title="Comfortable Gakujo をアップデート"><span style="display: inline-block; text-decoration: underline; color: blue"">Comfortable Gakujo v${version}</span></a>`;
+            indexMainVisualUserLastLogin.innerHTML += ` | <a href="${updateURL}" title="${t("updateLinkTitle")}"><span style="display: inline-block; text-decoration: underline; color: blue"">Comfortable Gakujo v${version}</span></a>`;
 
             showUpdateNotice();
             void checkGradeUpdates();
@@ -1372,31 +1733,18 @@
             const indexNoticeOtherItems = document.getElementsByClassName("index-notice-other-items")[0];
             const li = document.createElement('li');
             li.className = 'index-notice-other-item';
-            if (localStorage.getItem("cg_grade_save_enabled") === "1") {
-                li.innerHTML = `
-                    <div class="cg-index-main-visual-notice-box cg-index-notice-other-link">
-                        <p class="title" style="text-align: center;">成績更新通知</p>
-                        <div class="content">
-                            <div class="cg-checkbox-wrapper-8">
-                                <input type="checkbox" id="cg-grade-save-toggle" class="cg-tgl cg-tgl-skewed" checked>
-                                <label for="cg-grade-save-toggle" data-tg-on="ON" data-tg-off="OFF" class="cg-tgl-btn"></label>
-                            </div>
+            const checkedAttr = localStorage.getItem("cg_grade_save_enabled") === "1" ? " checked" : "";
+            li.innerHTML = `
+                <div class="cg-index-main-visual-notice-box cg-index-notice-other-link">
+                    <p class="title" style="text-align: center;">${t("gradeNoticeToggleTitle")}</p>
+                    <div class="content">
+                        <div class="cg-checkbox-wrapper-8">
+                            <input type="checkbox" id="cg-grade-save-toggle" class="cg-tgl cg-tgl-skewed"${checkedAttr}>
+                            <label for="cg-grade-save-toggle" data-tg-on="ON" data-tg-off="OFF" class="cg-tgl-btn"></label>
                         </div>
                     </div>
-                    `;
-            } else {
-                li.innerHTML = `
-                    <div class="cg-index-main-visual-notice-box cg-index-notice-other-link">
-                        <p class="title" style="text-align: center;">成績更新通知</p>
-                        <div class="content">
-                            <div class="cg-checkbox-wrapper-8">
-                                <input type="checkbox" id="cg-grade-save-toggle" class="cg-tgl cg-tgl-skewed">
-                                <label for="cg-grade-save-toggle" data-tg-on="ON" data-tg-off="OFF" class="cg-tgl-btn"></label>
-                            </div>
-                        </div>
-                    </div>
-                    `;
-            }
+                </div>
+                `;
             const style = document.createElement('style');
             style.textContent = `
                 .cg-index-main-visual-notice-box {
@@ -1583,7 +1931,7 @@
             });
 
             installBackgroundSettings();
-        } else if (document.title === "課題・アンケートリスト") {
+        } else if (isPage(document, "taskList")) {
             let processedSet = new WeakSet();
             let hiddenCount = 0;
             let originalTasksInstalled = false;
@@ -1602,8 +1950,8 @@
                     const th = document.createElement('th');
                     th.className = 'hidebutton-header';
                     th.style.width = "32px";
-                    th.textContent = "操作";
-                    th.title = "通常の課題は非表示、タスクは編集・削除・提出状況の切り替え";
+                    th.textContent = t("colAction");
+                    th.title = t("colActionTitle");
                     thead.querySelector("tr").insertBefore(th, thead.querySelector("tr").firstChild);
                 }
 
@@ -1619,7 +1967,7 @@
                             btn.type = 'button';
                             btn.name = 'row-hidebutton';
                             btn.value = '−';
-                            btn.title = '非表示にする';
+                            btn.title = t("hideButtonTitle");
                             btn.className = 'row-hidebutton';
                             btn.style.width = '24px';
                             btn.style.height = '24px';
@@ -1644,11 +1992,11 @@
                                 const hiddenRow = hiddenTasksTable.querySelector('#' + row.id);
                                 if (hiddenRow) hiddenRow.style.display = '';
                                 addHiddenTask(
-                                    hiddenRow.querySelector('td[data-label*="提出物種別"]')?.textContent?.trim() || "",
-                                    hiddenRow.querySelector('td[data-label*="講義名"]')?.innerHTML?.split('<br>')[0]?.trim() || "",
-                                    hiddenRow.querySelector('td[data-label*="タイトル"]')?.textContent?.trim() || "",
-                                    hiddenRow.querySelector('td[data-label*="提出期間"]')?.textContent?.trim() || "",
-                                    hiddenRow.querySelector('td[data-label*="提出状況"]')?.textContent?.trim() || ""
+                                    findTaskCell(hiddenRow, "type")?.textContent?.trim() || "",
+                                    findTaskCell(hiddenRow, "subject")?.innerHTML?.split('<br>')[0]?.trim() || "",
+                                    findTaskCell(hiddenRow, "title")?.textContent?.trim() || "",
+                                    findTaskCell(hiddenRow, "period")?.textContent?.trim() || "",
+                                    findTaskCell(hiddenRow, "status")?.textContent?.trim() || ""
                                 );
                                 const hiddenCountSpan = document.getElementById("hiddenCount");
                                 if (hiddenCountSpan) {
@@ -1685,9 +2033,9 @@
                         const hiddenRow = originalTable.querySelector('#' + row.id);
                         if (hiddenRow) hiddenRow.style.display = '';
                         removeHiddenTask(
-                            row.querySelector('td[data-label*="提出物種別"]')?.textContent?.trim() || "",
-                            row.querySelector('td[data-label*="講義名"]')?.innerHTML?.split('<br>')[0]?.trim() || "",
-                            row.querySelector('td[data-label*="タイトル"]')?.textContent?.trim() || ""
+                            findTaskCell(row, "type")?.textContent?.trim() || "",
+                            findTaskCell(row, "subject")?.innerHTML?.split('<br>')[0]?.trim() || "",
+                            findTaskCell(row, "title")?.textContent?.trim() || ""
                         );
                         const hiddenCountSpan = document.getElementById("hiddenCount");
                         if (hiddenCountSpan) {
@@ -1697,7 +2045,7 @@
                     });
                 });
                 hiddenTasksTable.querySelectorAll('.hidebutton-header').forEach(th => {
-                    th.innerHTML = "表示<br>する";
+                    th.innerHTML = t("showHeaderHtml");
                 });
 
                 hiddenTasksTable.querySelectorAll("tr").forEach(row => {
@@ -1710,9 +2058,9 @@
                 hiddenTasks.forEach(task => {
                     const rows = hiddenTasksTable.querySelectorAll("tr");
                     rows.forEach(row => {
-                        const submissionType = row.querySelector('td[data-label*="提出物種別"]')?.textContent?.trim() || "";
-                        const subject = row.querySelector('td[data-label*="講義名"]')?.innerHTML?.split('<br>')[0]?.trim() || "";
-                        const title = row.querySelector('td[data-label*="タイトル"]')?.textContent?.trim() || "";
+                        const submissionType = findTaskCell(row, "type")?.textContent?.trim() || "";
+                        const subject = findTaskCell(row, "subject")?.innerHTML?.split('<br>')[0]?.trim() || "";
+                        const title = findTaskCell(row, "title")?.textContent?.trim() || "";
 
                         if (submissionType === task.submissionType && subject === task.subject && title === task.title) {
                             hiddenCount++;
@@ -1721,8 +2069,8 @@
                             if (originalRow) {
                                 originalRow.style.display = 'none';
                             }
-                            const submittalTerm = row.querySelector('td[data-label*="提出期間"]')?.textContent?.trim() || "";
-                            const submittalStatus = row.querySelector('td[data-label*="提出状況"]')?.textContent?.trim() || "";
+                            const submittalTerm = findTaskCell(row, "period")?.textContent?.trim() || "";
+                            const submittalStatus = findTaskCell(row, "status")?.textContent?.trim() || "";
                             if (submittalTerm !== task.submittalTerm || submittalStatus !== task.submittalStatus) {
                                 removeHiddenTask(submissionType, subject, title);
                                 addHiddenTask(submissionType, subject, title, submittalTerm, submittalStatus);
@@ -1734,7 +2082,7 @@
                 const details = document.createElement('details');
                 details.style.marginTop = "2em";
                 const summary = document.createElement('summary');
-                summary.textContent = "非表示にした課題・アンケート ";
+                summary.textContent = t("hiddenSummary");
                 summary.style.cursor = "pointer";
                 summary.style.fontWeight = "bold";
                 summary.style.fontSize = "1.1em";
@@ -1749,7 +2097,7 @@
             }
 
             const getDeadlineDate = (row) => {
-                const td = row.querySelector('td[data-label*="提出期間"]');
+                const td = findTaskCell(row, "period");
                 const text = td?.textContent?.trim();
                 const match = text?.match(/～\s*([\d/]+)\s+([\d:]+)/);
                 if (!match) return new Date(0);
@@ -1779,8 +2127,8 @@
                     if (processedSet.has(row)) continue;
                     processedSet.add(row);
 
-                    const statusCell = row.querySelector('td[data-label*="提出状況"]');
-                    if (statusCell && statusCell.textContent.includes("提出済")) {
+                    const statusCell = findTaskCell(row, "status");
+                    if (isTaskSubmittedCell(statusCell)) {
                         row.style.backgroundColor = "#e5ffe5";
                         row.addEventListener('mouseover', () => {
                             row.style.backgroundColor = "#d1ffd1";
@@ -1793,7 +2141,7 @@
                     const deadline = getDeadlineDate(row);
                     const now = Date.now();
 
-                    const td = row.querySelector('td[data-label*="提出期間"]');
+                    const td = findTaskCell(row, "period");
                     if (!td) continue;
 
                     if (deadline.getHours() < 12) {
@@ -1888,8 +2236,8 @@
                 console.log(`[CG] Returning to task: ${subjectName} - ${taskTitle}`);
 
                 for (const row of rows) {
-                    const subjectCell = row.querySelector('td[data-label^="講義名"]');
-                    const titleCell = row.querySelector('td[data-label="タイトル"]');
+                    const subjectCell = findTaskCell(row, "subject");
+                    const titleCell = findTaskCell(row, "title");
 
                     if (!subjectCell || !titleCell) continue;
 
@@ -1902,7 +2250,7 @@
                     }
                 }
             }
-        } else if (document.title === "課題・アンケート詳細") {
+        } else if (isPage(document, "taskDetail")) {
             const btn = document.getElementsByClassName("c-btn-submit02")[0];
             if (btn && !btn.dataset.cgHooked) {
                 btn.dataset.cgHooked = "1";
@@ -1914,7 +2262,7 @@
             }
 
 
-        } else if (document.title === "成績情報" || document.title === "成績情報詳細") {
+        } else if (isPage(document, "gradeInfo")) {
             localStorage.removeItem("cg_grade_updated");
 
             function collectYearSemesters() {
@@ -1925,7 +2273,7 @@
                 if (!table) return { years: [], yearSemesters: [] };
 
                 table.querySelectorAll("tbody tr").forEach(tr => {
-                    const cell = tr.querySelector('td[data-label="成績報告時期"]');
+                    const cell = findGradeTermCell(tr);
                     const text = cell?.innerText.trim();
                     if (!text) return;
 
@@ -1952,7 +2300,7 @@
                 if (!table) return;
 
                 table.querySelectorAll("tbody tr").forEach(tr => {
-                    const cell = tr.querySelector('td[data-label="成績報告時期"]');
+                    const cell = findGradeTermCell(tr);
                     const text = cell?.innerText || "";
 
                     if (value === "all") {
@@ -2007,7 +2355,7 @@
                 box.className = "c-form-box u-w100per-sp";
                 box.id = "cg-year-semester-box";
 
-                box.appendChild(document.createTextNode("年度・期："));
+                box.appendChild(document.createTextNode(t("gradeFilterLabel")));
 
                 const wrapper = document.createElement("div");
                 wrapper.className = "select_wrapper u-w100per-sp";
@@ -2015,15 +2363,15 @@
                 const select = document.createElement("select");
                 select.className = "select u-w260-pc u-w100per-sp js-select";
 
-                select.appendChild(new Option("すべて表示", "all"));
+                select.appendChild(new Option(t("gradeFilterAll"), "all"));
 
                 years.forEach(y => {
-                    select.appendChild(new Option(`${y}年度`, y));
+                    select.appendChild(new Option(t("formatGradeYear", y), y));
                 });
 
                 yearSemesters.forEach(v => {
                     const [y, s] = v.split("-");
-                    select.appendChild(new Option(`${y}年度 ${s}`, v));
+                    select.appendChild(new Option(t("formatGradeTerm", y, s), v));
                 });
 
                 select.addEventListener("change", () => {
@@ -2060,13 +2408,13 @@
                 }
                 return false;
             });
-        } else if (document.title === "連絡一覧") {
+        } else if (isPage(document, "notificationList")) {
             const cPageNation = document.getElementsByClassName("c-pagination")[0];
             if (cPageNation) {
                 const markAsRead = document.createElement('div');
                 markAsRead.className = "c-filter_box c-form-box";
                 markAsRead.style.left = "20px";
-                markAsRead.innerHTML = `<button type="button" id="cg-mark-as-read" dialogtype="" reportoutputconfirm="true" loading="true" class="c-btn c-btn-submit01" filetype="null"><span class="c-btn-link"><span class="c-btn-text ">すべて既読にする</span></span></button>`;
+                markAsRead.innerHTML = `<button type="button" id="cg-mark-as-read" dialogtype="" reportoutputconfirm="true" loading="true" class="c-btn c-btn-submit01" filetype="null"><span class="c-btn-link"><span class="c-btn-text ">${t("markAllRead")}</span></span></button>`;
                 cPageNation.childNodes[0].insertBefore(markAsRead, cPageNation.childNodes[0].firstChild);
 
                 document.getElementById("cg-mark-as-read").addEventListener("click", () => {
@@ -2203,7 +2551,7 @@
                 iframe.name = "file_preview_" + Math.random().toString(36).substr(2, 9);
 
                 const previewBtn = document.createElement("button");
-                previewBtn.innerText = "ファイルをプレビュー";
+                previewBtn.innerText = t("previewButton");
                 previewBtn.type = "button";
                 previewBtn.className = "c-btn c-btn-line c-btn-sm";
                 previewBtn.style.marginTop = "5px";
@@ -2216,7 +2564,7 @@
                     insertWrapper(true);
 
                     const doc = iframe.contentDocument || iframe.contentWindow.document;
-                    if (doc) doc.body.innerHTML = "<div style='font-family: sans-serif; padding: 20px;'>読み込み中...</div>";
+                    if (doc) doc.body.innerHTML = `<div style='font-family: sans-serif; padding: 20px;'>${t("previewLoading")}</div>`;
 
                     const originalJqSubmit = window.jQuery ? window.jQuery.fn.submit : null;
                     const originalNativeSubmit = HTMLFormElement.prototype.submit;
@@ -2252,11 +2600,11 @@
                                 showPreview(blob);
                             } catch (e) {
                                 const doc2 = iframe.contentDocument || iframe.contentWindow.document;
-                                if (doc2) doc2.body.innerHTML = "<div style='font-family: sans-serif; padding: 20px; color: red;'>読み込みに失敗しました。</div>";
+                                if (doc2) doc2.body.innerHTML = `<div style='font-family: sans-serif; padding: 20px; color: red;'>${t("previewLoadFailed")}</div>`;
                             }
                         } else {
                             const doc2 = iframe.contentDocument || iframe.contentWindow.document;
-                            if (doc2) doc2.body.innerHTML = "<div style='font-family: sans-serif; padding: 20px; color: red;'>フォームの送信を検知できませんでした。</div>";
+                            if (doc2) doc2.body.innerHTML = `<div style='font-family: sans-serif; padding: 20px; color: red;'>${t("previewFormFailed")}</div>`;
                         }
                     }, 50);
                 });
@@ -2267,7 +2615,7 @@
                 insertWrapper(false);
 
                 const doc = iframe.contentDocument || iframe.contentWindow.document;
-                if (doc) doc.body.innerHTML = "<div style='font-family: sans-serif; padding: 20px;'>読み込み中...</div>";
+                if (doc) doc.body.innerHTML = `<div style='font-family: sans-serif; padding: 20px;'>${t("previewLoading")}</div>`;
 
                 fetch(link.href)
                     .then(res => res.blob())
@@ -2276,7 +2624,7 @@
                     })
                     .catch(e => {
                         const doc2 = iframe.contentDocument || iframe.contentWindow.document;
-                        if (doc2) doc2.body.innerHTML = "<div style='font-family: sans-serif; padding: 20px; color: red;'>読み込みに失敗しました。</div>";
+                        if (doc2) doc2.body.innerHTML = `<div style='font-family: sans-serif; padding: 20px; color: red;'>${t("previewLoadFailed")}</div>`;
                     });
             }
         });
@@ -2338,12 +2686,12 @@
                 `;
             document.head.appendChild(style);
             sidebar.innerHTML = `
-                    <a href="javascript:void(0);" onclick="javascript:ClearStorage(); javascript:postSubmit('emptyForm', 'SC_06001B00_01/init')" class="c-gnav-link cg-gnav-link"><i class="c-icon-search" aria-hidden="true"></i>シラバス</a>
-                    <a href="javascript:void(0);" onclick="javascript:ClearStorage(); javascript:postSubmit('emptyForm', 'SC_12001B00_01/initFromHome')" class="c-gnav-link cg-gnav-link"><i class="c-icon-edit" aria-hidden="true"></i>授業情報</a>
-                    <a href="javascript:void(0);" onclick="javascript:ClearStorage(); javascript:postSubmit('emptyForm', 'SC_14002B00_01/init')" class="c-gnav-link cg-gnav-link"><i class="c-icon-uploaed" aria-hidden="true"></i>課題提出</a>
-                    <a href="javascript:void(0);" onclick="javascript:ClearStorage(); javascript:postSubmit('emptyForm', 'SC_07002B00_01/initStudent')" class="c-gnav-link cg-gnav-link"><i class="c-icon-submission" aria-hidden="true"></i>履修登録</a>
-                    <a href="javascript:void(0);" onclick="javascript:ClearStorage(); javascript:postSubmit('emptyForm', 'SC_15005B00_01/init')" class="c-gnav-link cg-gnav-link"><i class="c-icon-graph" aria-hidden="true"></i>成績</a>
-                    <a href="javascript:void(0);" id="cg-credit-info" class="c-gnav-link cg-gnav-link"><i class="c-icon-check" aria-hidden="true"></i>単位情報</a>
+                    <a href="javascript:void(0);" onclick="javascript:ClearStorage(); javascript:postSubmit('emptyForm', 'SC_06001B00_01/init')" class="c-gnav-link cg-gnav-link"><i class="c-icon-search" aria-hidden="true"></i>${t("navSyllabus")}</a>
+                    <a href="javascript:void(0);" onclick="javascript:ClearStorage(); javascript:postSubmit('emptyForm', 'SC_12001B00_01/initFromHome')" class="c-gnav-link cg-gnav-link"><i class="c-icon-edit" aria-hidden="true"></i>${t("navClassInfo")}</a>
+                    <a href="javascript:void(0);" onclick="javascript:ClearStorage(); javascript:postSubmit('emptyForm', 'SC_14002B00_01/init')" class="c-gnav-link cg-gnav-link"><i class="c-icon-uploaed" aria-hidden="true"></i>${t("navTasks")}</a>
+                    <a href="javascript:void(0);" onclick="javascript:ClearStorage(); javascript:postSubmit('emptyForm', 'SC_07002B00_01/initStudent')" class="c-gnav-link cg-gnav-link"><i class="c-icon-submission" aria-hidden="true"></i>${t("navRegistration")}</a>
+                    <a href="javascript:void(0);" onclick="javascript:ClearStorage(); javascript:postSubmit('emptyForm', 'SC_15005B00_01/init')" class="c-gnav-link cg-gnav-link"><i class="c-icon-graph" aria-hidden="true"></i>${t("navGrades")}</a>
+                    <a href="javascript:void(0);" id="cg-credit-info" class="c-gnav-link cg-gnav-link"><i class="c-icon-check" aria-hidden="true"></i>${t("navCredits")}</a>
                 `;
         }
     }
